@@ -356,7 +356,7 @@ def main():
 
     named = [b for b in graph["buildings"] if b != OUTDOORS]
     print(f"{len(graph['nodes'])} nodes, {len(graph['edges'])} links "
-          f"across {len(named)} building(s) -> {out}")
+          f"across {len(named)} place(s) -> {out}")
     for b, v in graph["buildings"].items():
         if b == OUTDOORS:
             print(f"  {OUTDOORS}: {v['nodes']} nodes on paths between buildings")

@@ -28,7 +28,13 @@ const __dirname = path.dirname(__filename);
 
 const db = admin.firestore();
 
-app.use(express.json());
+// The traced network is one document and it grows: a few hundred nodes and
+// the links between them is already past express.json()'s 100kb default, and
+// every save was being refused with 413 once it crossed that line -- which
+// read, in the tracer, as a mysterious cap on how many nodes could be added.
+// There is no reason for a limit anywhere near the size of the thing being
+// saved, so it is set well clear of it.
+app.use(express.json({ limit: "50mb" }));
 app.use(requestLogger);
 
 const mapboxDistDir = path.dirname(require.resolve("mapbox-gl/dist/mapbox-gl.js"));

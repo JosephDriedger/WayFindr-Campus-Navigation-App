@@ -32,3 +32,6 @@ floorPlans/_discarded_auto/
 floorPlans/_prev_live/
 floorPlans/_manual_backup/
 
+# The copy the tracer keeps of the network as it was before the last save.
+# Insurance against a bad write, not something to track.
+*.prev

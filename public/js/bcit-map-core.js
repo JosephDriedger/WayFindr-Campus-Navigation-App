@@ -109,12 +109,26 @@ window.addEventListener("DOMContentLoaded", () => {
   // looked at recently and a two-room directions form, so the panel is a
   // starting point instead of a prompt.
 
+  // "LECTURE HALL" -> the rooms that go by that name, so a name with a space
+  // in it is recognised as one thing rather than split down the middle
+  const roomsByName = new Map();
+
   const roomIndexPromise = (async () => {
     try {
       const res = await fetch('/data/room-search-index.json', { cache: 'no-store' });
       if (!res.ok) return [];
       const json = await res.json();
-      return Array.isArray(json.rooms) ? json.rooms : [];
+      const rooms = Array.isArray(json.rooms) ? json.rooms : [];
+      // Rooms are known by their names as well as their numbers, and a name
+      // with a space in it has to be recognised whole -- "Lecture Hall" is
+      // not room HALL of a building called LECTURE.
+      for (const r of rooms) {
+        const name = String(r.name || '').trim().toUpperCase();
+        if (!name || !r.building || !r.room) continue;
+        if (!roomsByName.has(name)) roomsByName.set(name, []);
+        roomsByName.get(name).push({ building: r.building.toUpperCase(), room: String(r.room) });
+      }
+      return rooms;
     } catch {
       return []; // search still works off the building index alone
     }
@@ -144,6 +158,7 @@ window.addEventListener("DOMContentLoaded", () => {
   // only means a bare code typed in the first second is read as a room.
   const buildingCodes = new Set();
   const buildingNames = new Map();   // code -> "Tall Timber Student Housing"
+  const placeKinds = new Map();      // code -> 'building' | 'parking'
 
   const RECENTS_KEY = 'wayfindr.recentRooms';
   const RECENTS_MAX = 8;
@@ -164,6 +179,9 @@ window.addEventListener("DOMContentLoaded", () => {
         const room = String(r.room).toUpperCase();
         const building = String(r.building).toUpperCase();
         if (room.startsWith(`${building}-`) || room === building) return false;
+        // "LOT-A" is a place whose name has a space in it, split down the
+        // middle by a parser that did not know better and stored as a room
+        if (buildingCodes.has(`${building} ${room}`)) return false;
         // a room whose "number" is another building's code -- "SW3-SW7" --
         // came from a destination reference being stored whole
         return !buildingCodes.has(room);
@@ -287,7 +305,7 @@ window.addEventListener("DOMContentLoaded", () => {
         scored.push({
           rank, building: code, room: '', isBuilding: true,
           name: buildingNames.get(label) || null,
-          floorLabel: 'Building',
+          floorLabel: placeKinds.get(label) === 'parking' ? 'Parking' : 'Building',
         });
       }
       for (const r of rooms) {
@@ -397,10 +415,32 @@ window.addEventListener("DOMContentLoaded", () => {
   // "SW3-1600", "sw3 1600" and a bare "1600" all mean something here; the
   // bare form only works when the other field names a building.
   const parseRoomRef = (raw) => {
-    const s = (raw || '').trim().toUpperCase();
+    const s = (raw || '').trim().toUpperCase().replace(/\s+/g, ' ');
     if (!s) return null;
+    // A place whose name has a space in it -- "LOT A", "LOT Q" -- is one
+    // name, not a building and a room. Checking the whole string against the
+    // places we know about first is what stops "LOT A" being read as room A
+    // of a building called LOT.
+    if (buildingCodes.has(s)) return { building: s, room: '' };
+
+    // The same trap catches rooms: "Lecture Hall" was being read as room HALL
+    // of a building called LECTURE. A room name is only accepted when it
+    // names exactly one room -- three of them are lecture halls, and picking
+    // one for the user would be picking wrong two times in three.
+    const named = roomsByName.get(s);
+    if (named && named.length === 1) {
+      return { building: named[0].building, room: named[0].room };
+    }
+    if (named && named.length > 1) {
+      return { ambiguous: s, building: null, room: s };
+    }
+
+    // Only a code we recognise separates a building from a room. Splitting on
+    // the first space regardless is what turned every two-word name into a
+    // building nobody has heard of.
     const m = s.match(/^([A-Z]+\d*)[-\s]+(\S.*)$/);
-    if (m) return { building: m[1], room: m[2].trim() };
+    if (m && buildingCodes.has(m[1])) return { building: m[1], room: m[2].trim() };
+    if (m && /\d/.test(m[2])) return { building: m[1], room: m[2].trim() };
     // A building code on its own is a destination too -- "take me to SW3"
     // when you do not know which room you want. It has no room, and the
     // router reads that as "anywhere in this building".
@@ -432,6 +472,13 @@ window.addEventListener("DOMContentLoaded", () => {
     if (!to) {
       showError('Enter a room or a building to go to.');
       return false;
+    }
+    for (const ref of [from, to]) {
+      if (ref?.ambiguous) {
+        showError(`More than one room is called ${ref.ambiguous}. `
+          + 'Pick the one you mean from the list.');
+        return false;
+      }
     }
     if (!from) {
       // No start given means "from where I am": the nearest point on the
@@ -710,9 +757,15 @@ window.addEventListener("DOMContentLoaded", () => {
         // A leg is a space, on a floor, in a building. Crossing from one
         // building to another starts a new leg even when neither end has a
         // room number -- walking out of SW3 and into SW7 is two things.
-        if (last && last.space === space && last.floor === p.floor
+        // Same space, same building, and a floor that does not contradict:
+        // a node whose floor was never recorded is not a different floor, and
+        // treating it as one broke a single walk down one hallway into four
+        // steps that each said "follow the hallway".
+        const sameFloor = last && (last.floor === p.floor || !last.floor || !p.floor);
+        if (last && last.space === space && sameFloor
           && last.building === (p.building || null)) {
           last.metres += gap;
+          last.floor = last.floor || p.floor;
           last.end = p;
         } else {
           legs.push({
@@ -766,15 +819,22 @@ window.addEventListener("DOMContentLoaded", () => {
         return arriving ? leg.building : 'the hallway';
       };
 
-      let lastFloor = null;
+      // Where you are, as a heading: the building and the floor of it. A
+      // route that leaves the building needs to say so, and a node inside a
+      // building that has no floor recorded is still in that building -- it
+      // was announcing "SW3" as a new place one step after "Floor 1".
+      let lastZone = null;
+      let lastBuilding = null;
       legs.forEach((leg, i) => {
-        // A node outdoors is on no floor, and "Floor null" is not a heading.
-        const where = leg.floor ? `Floor ${leg.floor}`
-          : leg.building ? leg.building : 'Outside';
-        if (where !== lastFloor) {
-          push(where, 'floor-heading');
-          lastFloor = where;
+        const zone = !leg.building ? 'Outside'
+          : leg.floor ? `${leg.building} · Floor ${leg.floor}`
+            : leg.building === lastBuilding ? lastZone   // still inside it
+              : leg.building;
+        if (zone !== lastZone) {
+          push(zone, 'floor-heading');
+          lastZone = zone;
         }
+        if (leg.building) lastBuilding = leg.building;
         const isLast = i === legs.length - 1;
         if (i === 0) {
           push(`Start at ${named(leg)}`);
@@ -917,18 +977,25 @@ window.addEventListener("DOMContentLoaded", () => {
     const fromLabel = opts.fromLabel || makeRoomLabel(b, '', from);
     const toLabel = opts.toLabel || makeRoomLabel(b, '', to);
     renderDirectionsCard({ fromLabel, toLabel });
-    await requestAndOverlayIndoorPath(b, from, b, to, fromLabel, toLabel, { fit: true });
-    // `to` may be fully qualified ("SW3-1750") or a building on its own
-    // ("SW7"), so it is split before being remembered -- otherwise recents
-    // filled up with "SW3-SW3-1750" and "SW3-SW7".
-    const toRef = parseRoomRef(to);
-    if (toRef?.room) rememberRoom({ building: toRef.building || b, room: toRef.room });
+    const routed = await requestAndOverlayIndoorPath(
+      b, from, b, to, fromLabel, toLabel, { fit: true });
+
+    // Only somewhere you actually got to is worth remembering. Recording the
+    // destination whatever happened filled the Recent list with the typos and
+    // dead ends of every failed attempt.
+    if (routed) {
+      // `to` may be fully qualified ("SW3-1750") or a building on its own
+      // ("SW7"), so it is split before being remembered.
+      const toRef = parseRoomRef(to);
+      if (toRef?.room) rememberRoom({ building: toRef.building || b, room: toRef.room });
+    }
   };
 
+  /** Draws a route, and says whether there was one. */
   async function requestAndOverlayIndoorPath(startBuildingCode, startRoomOrEntrance, goalBuildingCode, goalRoom, fromLabel, toLabel, { fit = false } = {}) {
     if (isOverlayingIndoor) {
       console.log('[INDOOR] overlay in progress, skipping');
-      return;
+      return false;
     }
     isOverlayingIndoor = true;
     try {
@@ -942,7 +1009,7 @@ window.addEventListener("DOMContentLoaded", () => {
       if (!response.ok || !result || !result.success) {
         console.warn('[INDOOR PATH]', result?.message || response.statusText);
         renderDirectionsCard({ fromLabel, toLabel, message: result?.message || 'Indoor route not available for this building yet.' });
-        return;
+        return false;
       }
 
       // Awaited, not fired off: focusRoom draws the building card into the
@@ -959,9 +1026,11 @@ window.addEventListener("DOMContentLoaded", () => {
 
       renderIndoorPath(result.path, { fit });
       renderDirectionsCard({ fromLabel, toLabel, path: result.path, distanceM: result.distanceM });
+      return true;
     } catch (error) {
       console.error('[INDOOR PATH ERROR]:', error);
       renderDirectionsCard({ fromLabel, toLabel, message: 'Something went wrong finding that route.' });
+      return false;
     } finally {
       isOverlayingIndoor = false;
     }
@@ -1193,6 +1262,84 @@ window.addEventListener("DOMContentLoaded", () => {
         if (!code) continue;
         buildingCodes.add(code);
         if (p.Display_Name) buildingNames.set(code, p.Display_Name);
+      }
+
+      // Car parks, in their own colour and their own layer. Not buildings --
+      // no floors, you drive into them -- but places all the same, and ones
+      // people ask to be taken to more often than any single room.
+      try {
+        const parking = await getJSON('/data/parking-lots.geojson');
+        map.addSource('parking', { type: 'geojson', data: parking });
+        // Purple, and solid enough to see. At the opacity this started on it
+        // was a suggestion of a colour next to the blue of the buildings, and
+        // a car park you cannot pick out is not marked at all.
+        map.addLayer({
+          id: 'parking-fill', type: 'fill', source: 'parking',
+          paint: { 'fill-color': '#7c3aed', 'fill-opacity': 0.32 },
+        });
+        map.addLayer({
+          id: 'parking-line', type: 'line', source: 'parking',
+          paint: { 'line-color': '#5b21b6', 'line-width': 1.6, 'line-opacity': 0.9 },
+        });
+        // Clicking a lot offers directions to it, the same as a building.
+        // Without this a lot is decoration: visible, named, and no way to say
+        // "take me there" except by typing its name.
+        map.on('mouseenter', 'parking-fill', () => { map.getCanvas().style.cursor = 'pointer'; });
+        map.on('mouseleave', 'parking-fill', () => { map.getCanvas().style.cursor = ''; });
+        map.on('click', 'parking-fill', (e) => {
+          const p = e.features?.[0]?.properties || {};
+          const name = String(p.name || '').trim();
+          if (!name) return;
+          // A GeoJSON source hands array properties back as JSON text, so
+          // this has to cope with both shapes.
+          const kinds = Array.isArray(p.kinds) ? p.kinds : (() => {
+            try { return JSON.parse(p.kinds || '[]'); } catch { return []; }
+          })();
+          clearRouteOverlay();
+          sidebar.setBody(`
+            <div class="place-card">
+              <button type="button" class="sidebar-back"
+                      onclick="window.BCITMap.clearNavigation();">&larr; Back</button>
+              <h2>${esc(name)}</h2>
+              <div class="place-sub">Parking${p.stalls ? ` · ${esc(p.stalls)} stalls` : ''}</div>
+              ${kinds.length ? `<div class="place-name">${esc(kinds.join(' · '))}</div>` : ''}
+              <div class="place-actions">
+                <!-- the handler is attached below rather than written inline:
+                     a name with an apostrophe in it would end the string -->
+                <button type="button" class="btn-primary" id="parking-directions">Directions</button>
+              </div>
+              ${p.hours ? `<p class="sidebar-hint">${esc(p.hours)}</p>` : ''}
+            </div>`);
+          const go = document.getElementById('parking-directions');
+          if (go) go.addEventListener('click', () => routeToBuilding(name));
+        });
+
+        map.addLayer({
+          id: 'parking-label', type: 'symbol', source: 'parking',
+          // a lot traced in several pieces is still one lot with one name
+          filter: ['==', ['get', 'label'], true],
+          layout: {
+            'text-field': ['get', 'name'],
+            'text-size': ['interpolate', ['linear'], ['zoom'], 14, 10, 18, 14],
+          },
+          paint: {
+            'text-color': '#5b21b6',
+            'text-halo-color': '#ffffff', 'text-halo-width': 1.4,
+          },
+        });
+        for (const f of parking.features || []) {
+          const name = String((f.properties || {}).name || '').toUpperCase();
+          if (!name) continue;
+          buildingCodes.add(name);
+          placeKinds.set(name, 'parking');
+          const kinds = f.properties.kinds || [];
+          const what = kinds.length ? kinds[0] : 'Parking';
+          buildingNames.set(name, f.properties.stalls
+            ? `${what} · ${f.properties.stalls} stalls`
+            : what);
+        }
+      } catch (err) {
+        console.warn('parking lots unavailable:', err.message);
       }
 
       map.addSource('buildings', { type: 'geojson', data: buildings });

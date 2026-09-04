@@ -40,7 +40,16 @@ async function fetchJson(url, options) {
     }
     throw new Error(`Unreadable response from the server (${res.status}).`);
   }
-  if (!res.ok) throw new Error(data.detail || data.error || `Request failed (${res.status})`);
+  if (!res.ok) {
+    // Two error shapes reach here: this app's own `{error: "what went
+    // wrong"}`, and the generic handler's `{error: true, message: "..."}`.
+    // Reading `error` blindly turned the second kind into the word "true",
+    // which is what the tracer showed instead of telling you the save had
+    // been refused.
+    const said = [data.detail, data.message, typeof data.error === "string" && data.error]
+      .find((v) => typeof v === "string" && v.trim());
+    throw new Error(said || `Request failed (${res.status})`);
+  }
   return data;
 }
 
@@ -63,6 +72,9 @@ window.BCITTracer = {
   handles: () => ({ move: moveMarker, size: sizeMarker, rotate: rotateMarker }),
   overview: () => overviewFeatures,
   refresh: () => loadOverview(),
+  // the actual redraw, so its cost can be measured rather than guessed at
+  redraw: () => redrawRooms(),
+  time: () => { profile = {}; redrawRooms(); const p = profile; profile = null; return p; },
 };
 
 // ---------------------------------------------------------------------------
@@ -111,6 +123,7 @@ const ROOMS_SRC = "traced-rooms";
 const MARKS_SRC = "traced-marks";
 const PATHS_SRC = "traced-paths";
 const CAMPUS_SRC = "campus-buildings";
+const PARKING_SRC = "campus-parking";
 const OVERVIEW_SRC = "traced-overview";
 const DRAFT_SRC = "draft-room";
 
@@ -143,6 +156,11 @@ function uvToLngLat([u, v]) {
 
 /** [lng, lat] -> (u, v); the inverse, used when you click on the map */
 function lngLatToUv([lng, lat]) {
+  // No sheet open means no plan space to be in. The network does not need
+  // one -- it is held in world coordinates -- so this answers "nowhere on a
+  // drawing" rather than throwing, which is what placing a node with no
+  // floor open used to do.
+  if (!placement || !current) return null;
   const { widthM, heightM } = planSize();
   const dx = (lng - placement.lng) * mPerDegLng(placement.lat);
   const dy = (lat - placement.lat) * mPerDegLat();
@@ -267,6 +285,26 @@ function ensureLayers() {
       },
     });
   }
+  if (!map.getSource(PARKING_SRC)) {
+    map.addSource(PARKING_SRC, { type: "geojson", data: emptyFC() });
+    map.addLayer({
+      id: "parking-fill", type: "fill", source: PARKING_SRC,
+      paint: { "fill-color": "#8b5cf6", "fill-opacity": 0.1 },
+    });
+    map.addLayer({
+      id: "parking-line", type: "line", source: PARKING_SRC,
+      paint: { "line-color": "#6d28d9", "line-width": 1, "line-opacity": 0.4 },
+    });
+    map.addLayer({
+      id: "parking-label", type: "symbol", source: PARKING_SRC,
+      filter: ["==", ["get", "label"], true],
+      layout: { "text-field": ["get", "name"], "text-size": 10 },
+      paint: {
+        "text-color": "#5b21b6", "text-opacity": 0.6,
+        "text-halo-color": "#fff", "text-halo-width": 1.2,
+      },
+    });
+  }
   if (!map.getSource(OVERVIEW_SRC)) {
     // Everything already traced, campus-wide, sitting under the working
     // layers. Without it the tracer opens on a blank map and there is no way
@@ -323,7 +361,27 @@ function ensureLayers() {
 
 const round6 = ([u, v]) => [Number(u.toFixed(6)), Number(v.toFixed(6))];
 
-const nodeById = (nid) => rooms.find((r) => r.nid === nid);
+// Every link has to find the two nodes it joins, and it used to do that by
+// scanning the whole list -- so drawing the network cost links x items. At a
+// few hundred that is imperceptible; at eight thousand it was most of a
+// second per redraw, and a redraw happens on every click. An index turns each
+// lookup into one step, and is thrown away whenever the list changes so it
+// cannot go stale.
+let nidIndex = null;
+
+function forgetNodeIndex() {
+  nidIndex = null;
+}
+
+const nodeById = (nid) => {
+  if (!nidIndex) {
+    nidIndex = new Map();
+    for (const r of rooms) {
+      if (r.nid) nidIndex.set(r.nid, r);
+    }
+  }
+  return nidIndex.get(nid);
+};
 
 /**
  * Where an item is, in the world.
@@ -339,7 +397,7 @@ function itemLngLat(r) {
 
 /** The same position in plan space, which is what the drawing code works in. */
 function itemUv(r) {
-  return r.ll ? lngLatToUv(r.ll) : r.uv;
+  return r.ll ? lngLatToUv(r.ll) : r.uv;   // null when no plan is open
 }
 
 function pathFeature(r) {
@@ -449,30 +507,75 @@ let names = [];
 // dragged or the page is opened again.
 let campus = [];
 
+// Whether the campus network was actually read from the server. Until it has
+// been, there is nothing safe to write back.
+let networkLoaded = false;
+
+// What the server had when we last agreed with it: which version, and a
+// signature per feature so a save can send what changed instead of the whole
+// campus. Correctness first -- if any of this is missing or in doubt, the
+// whole document goes, which always works.
+let netVersion = null;
+let netBaseline = new Map();   // feature key -> signature of its contents
+
 async function loadCampus() {
+  const shapes = (fc, nameOf) => (fc.features || [])
+    .map((f) => ({
+      name: nameOf(f.properties || {}),
+      rings: f.geometry?.type === "Polygon"
+        ? [f.geometry.coordinates[0]]
+        : (f.geometry?.coordinates || []).map((poly) => poly[0]),
+    }))
+    .filter((b) => b.name && b.rings.length);
+
   try {
     const fc = await fetchJson("/data/bcit-coordinates.geojson");
+    // Car parks are places too: a node standing in Lot L belongs to Lot L,
+    // the same way one in SW3 belongs to SW3, and that is what makes a lot
+    // somewhere you can be routed to.
+    let lots = { features: [] };
+    try {
+      lots = await fetchJson("/data/parking-lots.geojson");
+    } catch { /* the campus is still usable without them */ }
+
     whenStyleReady(() => {
       ensureLayers();
       map.getSource(CAMPUS_SRC)?.setData({
         type: "FeatureCollection",
         features: (fc.features || []).filter((f) => (f.properties || {}).BuildingName),
       });
+      map.getSource(PARKING_SRC)?.setData(lots);
     });
-    campus = (fc.features || [])
-      .map((f) => ({
-        name: (f.properties || {}).BuildingName,
-        rings: f.geometry.type === "Polygon"
-          ? [f.geometry.coordinates[0]]
-          : (f.geometry.coordinates || []).map((poly) => poly[0]),
-      }))
-      .filter((b) => b.name && b.rings.length);
+
+    // Buildings first: where a lot outline overlaps a building, the building
+    // is the more specific answer.
+    campus = shapes(fc, (p) => p.BuildingName)
+      .concat(shapes(lots, (p) => p.name));
   } catch {
     campus = []; // the tracer works without it; nodes just carry no building
   }
 }
 
+/** The bounding box of a ring, computed once and kept. */
+function ringBox(ring) {
+  if (ring.__box) return ring.__box;
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const [x, y] of ring) {
+    if (x < x0) x0 = x;
+    if (y < y0) y0 = y;
+    if (x > x1) x1 = x;
+    if (y > y1) y1 = y;
+  }
+  const box = [x0, y0, x1, y1];
+  Object.defineProperty(ring, "__box", { value: box, enumerable: false });
+  return box;
+}
+
 function inRing(ring, [x, y]) {
+  // A box test first: a point is outside almost every outline on campus, and
+  // rejecting those in four comparisons beats walking their vertices.
+  const [x0, y0, x1, y1] = ringBox(ring);
+  if (x < x0 || x > x1 || y < y0 || y > y1) return false;
   let inside = false;
   for (let i = 0; i < ring.length; i += 1) {
     const j = (i - 1 + ring.length) % ring.length;
@@ -504,9 +607,13 @@ function nodeFeature(r) {
     properties: {
       type: "node",
       nid: r.nid,
-      // which building it is in is a fact about where it stands, so it is
-      // read from the campus outlines rather than from the sheet being traced
-      building: r.building ?? buildingAt(itemLngLat(r)),
+      // Which building it is in is a fact about where it stands, worked out
+      // when the node is placed or moved -- not here. Drawing is not the
+      // moment to ask a geometric question: this ran a point-in-polygon test
+      // against every outline on campus for every node without a building,
+      // which is most of them, on every redraw. Outdoors is a real answer and
+      // is kept as null rather than recomputed for ever.
+      building: r.building ?? null,
       floor: r.floor ?? null,
       room: r.room || null,
     },
@@ -526,9 +633,24 @@ function renderFeature(r, i) {
   return f;
 }
 
+// Timings for the redraw, filled in when someone is measuring. Free when
+// nobody is: one comparison per redraw.
+let profile = null;
+function mark(label, t0) {
+  if (profile) profile[label] = Math.round((performance.now() - t0) * 10) / 10;
+}
+
 function redrawRooms() {
+  // Rebuilt here rather than lazily, so a redraw always works from a current
+  // index even if some mutation forgot to say it had changed things.
+  forgetNodeIndex();
+  let t0 = performance.now();
   names = displayNames();
+  mark("names", t0);
+
+  t0 = performance.now();
   const built = rooms.map(renderFeature).filter(Boolean);
+  mark("features", t0);
   map.getSource(PATHS_SRC)?.setData({
     type: "FeatureCollection",
     features: built.filter((f) => f.geometry.type === "LineString"),
@@ -538,11 +660,32 @@ function redrawRooms() {
     type: "FeatureCollection",
     features: built.filter((f) => f.geometry.type === "Polygon"),
   });
+  t0 = performance.now();
   map.getSource(MARKS_SRC)?.setData({
     type: "FeatureCollection",
     features: built.filter((f) => f.geometry.type === "Point"),
   });
-  renderRoomList();
+  mark("sources", t0);
+  scheduleListRender();
+}
+
+// Every node placed redraws the map and the list. The map is a source
+// update; the list is several hundred rows of DOM, rebuilt from scratch. At a
+// few hundred items that is a stutter and at a few thousand it is a wall --
+// which is a limit on how much network you can draw, so the list waits for a
+// frame and a run of quick clicks costs one rebuild rather than twenty.
+let listPending = null;
+function scheduleListRender() {
+  if (listPending) return;
+  // A timer rather than requestAnimationFrame: a browser stops handing out
+  // frames to a tab that is not on screen, and the list would then quietly
+  // stop matching what has been placed.
+  listPending = setTimeout(() => {
+    listPending = null;
+    const t0 = performance.now();
+    renderRoomList();
+    if (profile) profile.list = Math.round((performance.now() - t0) * 10) / 10;
+  }, 16);
 }
 
 /**
@@ -557,11 +700,32 @@ function applyModeStyling() {
   const set = (layer, prop, value) => {
     if (map.getLayer(layer)) map.setPaintProperty(layer, prop, value);
   };
+  const show = (layer, on) => {
+    if (map.getLayer(layer)) {
+      map.setLayoutProperty(layer, "visibility", on ? "visible" : "none");
+    }
+  };
+  const filter = (layer, f) => {
+    if (map.getLayer(layer)) map.setFilter(layer, f);
+  };
+
   set("traced-fill", "fill-opacity", net ? 0.07 : 0.22);
   set("traced-line", "line-opacity", net ? 0.35 : 1);
   set("traced-label", "text-opacity", net ? 0.35 : 1);
-  set("marks-dot", "circle-opacity", net ? 0.3 : 1);
-  set("paths-line", "line-opacity", net ? 0.95 : 0.3);
+
+  // The network is shown when you are working on it and gone when you are
+  // not. Fading it to 30% still left a web of lines over every room while
+  // tracing a floor; it is a different job, so it is a different picture.
+  show("paths-line", net);
+  // Nodes and markers share a layer. In network mode the nodes are the point
+  // and the doorways are not; on the floor plan it is the other way round.
+  filter("marks-dot", net
+    ? ["==", ["get", "type"], "node"]
+    : ["!=", ["get", "type"], "node"]);
+  filter("marks-label", net
+    ? ["==", ["get", "type"], "node"]
+    : ["!=", ["get", "type"], "node"]);
+  set("marks-dot", "circle-opacity", 1);
 }
 
 function setMode(next) {
@@ -574,6 +738,8 @@ function setMode(next) {
   // one task on screen at a time: the whole block for the other one goes
   el("planMode").hidden = next !== "plan";
   el("networkMode").hidden = next !== "network";
+  el("listBlock").hidden = next !== "plan";
+  el("netListBlock").hidden = next !== "network";
   el("netToolsResult").hidden = true;
   el("startNetDraw").textContent = networkButtonLabel();
   setDrawHint(next === "network"
@@ -794,25 +960,54 @@ function snappedUv(lngLat) {
  * index into the list. Only ones belonging to the mode being worked on, so
  * dragging a room's doorway while tracing the network is not possible.
  */
+/**
+ * How far SNAP_PX reaches, in degrees, at the current view.
+ *
+ * Projecting a point is not free, and the hit test ran it over every marker
+ * on the campus for every mouse move. Almost all of them are nowhere near the
+ * pointer, and a subtraction is enough to say so.
+ */
+function snapReach() {
+  const c = map.getCenter();
+  const p = map.project(c);
+  const edge = map.unproject([p.x + SNAP_PX, p.y + SNAP_PX]);
+  return {
+    lng: Math.abs(edge.lng - c.lng) * 1.5,   // a margin for rotation
+    lat: Math.abs(edge.lat - c.lat) * 1.5,
+  };
+}
+
 function pointIndexNear(lngLat) {
   const here = map.project(lngLat);
+  const reach = snapReach();
   let best = -1, bestD = SNAP_PX;
-  rooms.forEach((r, i) => {
-    if (r.kind !== "point" || !itemInMode(r)) return;
-    const p = map.project(itemLngLat(r));
+  for (let i = 0; i < rooms.length; i += 1) {
+    const r = rooms[i];
+    if (r.kind !== "point" || !itemInMode(r)) continue;
+    const at = itemLngLat(r);
+    if (!at) continue;
+    // the cheap rejection, before the expensive projection
+    if (Math.abs(at[0] - lngLat.lng) > reach.lng) continue;
+    if (Math.abs(at[1] - lngLat.lat) > reach.lat) continue;
+    const p = map.project(at);
     const d = Math.hypot(p.x - here.x, p.y - here.y);
     if (d <= bestD) { bestD = d; best = i; }
-  });
+  }
   return best;
 }
 
 /** The walking node under the pointer, if there is one. */
 function nodeNear(lngLat) {
   const here = map.project(lngLat);
+  const reach = snapReach();
   let best = null, bestD = SNAP_PX;
   for (const r of rooms) {
     if (r.kind !== "point" || r.type !== "node") continue;
-    const p = map.project(itemLngLat(r));
+    const at = itemLngLat(r);
+    if (!at) continue;
+    if (Math.abs(at[0] - lngLat.lng) > reach.lng) continue;
+    if (Math.abs(at[1] - lngLat.lat) > reach.lat) continue;
+    const p = map.project(at);
     const d = Math.hypot(p.x - here.x, p.y - here.y);
     if (d <= bestD) { bestD = d; best = r; }
   }
@@ -915,6 +1110,7 @@ function onMapClick(e) {
       && r.nodes.includes(first) && r.nodes.includes(node.nid));
     if (existing >= 0) rooms.splice(existing, 1);
     else rooms.push({ kind: "path", nodes: [first, node.nid] });
+    forgetNodeIndex();
     draft = [];
     selected = -1;
     redrawRooms();
@@ -936,7 +1132,9 @@ function onMapClick(e) {
     // makes it routable -- so it takes the name of whatever it lands on
     // rather than waiting to be told afterwards.
     const ll = [e.lngLat.lng, e.lngLat.lat];
+    // which traced room it lands in, if a floor is open to land on
     const servedRoom = roomAtUv(lngLatToUv(ll));
+    forgetNodeIndex();
     rooms.push({
       kind: "point", type: "node", nid: newNodeId(),
       // world coordinates: a node is part of the campus network, not of the
@@ -944,7 +1142,9 @@ function onMapClick(e) {
       ll,
       room: servedRoom,
       building: buildingAt(ll),
-      floor: buildingAt(ll) === current.building ? current.floor : null,
+      // the floor only means something if this is the building whose floor
+      // is open; a node dropped anywhere else is on no particular floor
+      floor: current && buildingAt(ll) === current.building ? current.floor : null,
     });
     redrawRooms();
     markDirty();
@@ -957,6 +1157,7 @@ function onMapClick(e) {
 
   if (isPointType(type)) {
     rooms.push({ kind: "point", uv: snappedUv(e.lngLat), room: null, type });
+    forgetNodeIndex();
     draft = null;
     redrawDraft();
     setDrafting(false);
@@ -979,6 +1180,10 @@ function setDrafting(on) {
   // nodes and links have nothing to "finish" -- each click completes itself
   const t = activeType();
   el("draftControls").hidden = !on || isPointType(t) || isLinkType(t);
+  // ...but placing nodes and drawing links run until you stop them, and
+  // until now the only way to stop was Esc or switching tool. A visible Done
+  // is what tells you the mode is still on, as well as how to leave it.
+  el("doneNetDraw").hidden = !(on && (t === "node" || isLinkType(t)));
   el("startDraw").disabled = on;
   el("startNetDraw").disabled = on;
   // double-click finishes a room, so it must not also zoom the map
@@ -989,6 +1194,7 @@ function setDrafting(on) {
 function finishDraft() {
   if (!draft || draft.length < 3) return;
   rooms.push({ kind: "polygon", uv: draft, room: null, type: activeType() });
+  forgetNodeIndex();
   draft = null;
   redrawDraft();
   setDrafting(false);
@@ -1006,27 +1212,57 @@ function cancelDraft() {
 // ---------------------------------------------------------------------------
 // Room list + details
 // ---------------------------------------------------------------------------
-function renderRoomList() {
-  const list = el("roomList");
-  const shown = rooms.map((r, i) => ({ r, i })).filter(({ r }) => itemInMode(r));
-  const counter = mode === "network" ? el("netCount") : el("roomCount");
-  if (counter) counter.textContent = shown.length;
+/**
+ * Fill one list element with rows.
+ *
+ * In the order they were traced, a list is the order you happened to work in
+ * -- which is no order at all once there are two hundred rows. Sorted by what
+ * each row is called, a room number is where you would look for it, and the
+ * index stays the real one: only the order they are rendered changes.
+ */
+// How many rows are worth putting on screen at once. Past this, a list is
+// not something you read -- it is something you search -- and building tens of
+// thousands of rows costs more than a second and a great deal of memory.
+const LIST_LIMIT = 300;
 
-  // In the order they were traced, the list is the order you happened to work
-  // in -- which is no order at all once there are two hundred rows. Sorted by
-  // what each row is called, a room number is where you would look for it.
-  // Numeric-aware, so 1985 comes after 1750 rather than between 1 and 2, and
-  // the index stays the real one: only the order they are rendered changes.
-  shown.sort((a, b) => String(names[a.i]?.title ?? "")
-    .localeCompare(String(names[b.i]?.title ?? ""), undefined,
-      { numeric: true, sensitivity: "base" }));
-  if (!shown.length) {
+// One collator, reused. String.prototype.localeCompare builds a fresh one on
+// every call, which over ten thousand rows is most of the cost of sorting
+// them -- half a second of it.
+const NAME_ORDER = new Intl.Collator(undefined, {
+  numeric: true, sensitivity: "base",
+});
+
+function fillList(list, entries, emptyText, opts = {}) {
+  if (!list) return;
+  const { filter = "", moreEl = null } = opts;
+
+  const needle = filter.trim().toLowerCase();
+  const matching = needle
+    ? entries.filter(({ i }) => {
+      const n = names[i];
+      return `${n?.title ?? ""} ${n?.sub ?? ""}`.toLowerCase().includes(needle);
+    })
+    : entries;
+
+  matching.sort((a, b) => NAME_ORDER.compare(
+    String(names[a.i]?.title ?? ""), String(names[b.i]?.title ?? "")));
+
+  if (!matching.length) {
     list.innerHTML = `<li class="tracer-empty">${
-      mode === "network" ? "No walking network yet." : "Nothing traced yet."}</li>`;
+      esc(needle ? "Nothing matches that." : emptyText)}</li>`;
+    if (moreEl) moreEl.hidden = true;
     return;
   }
-  // Sixty identical "node" rows tell you nothing, so each is numbered within
-  // its own kind and says what it serves.
+
+  const shown = matching.slice(0, LIST_LIMIT);
+  if (moreEl) {
+    const hidden = matching.length - shown.length;
+    moreEl.hidden = hidden <= 0;
+    moreEl.textContent = hidden > 0
+      ? `Showing ${shown.length} of ${matching.length} — type above to narrow it down.`
+      : "";
+  }
+
   list.innerHTML = shown.map(({ i }) => {
     const { title, sub } = names[i] || { title: "?", sub: "" };
     return `
@@ -1050,6 +1286,29 @@ function renderRoomList() {
   list.querySelectorAll(".tracer-del").forEach((b) => {
     b.addEventListener("click", () => removeItem(Number(b.dataset.i)));
   });
+}
+
+function renderRoomList() {
+  const shown = rooms.map((r, i) => ({ r, i })).filter(({ r }) => itemInMode(r));
+
+  // Nodes and links are different things, and there are hundreds of each.
+  // One list holding both meant scrolling past two hundred links to reach a
+  // node, so in network mode they get a list each.
+  if (mode === "network") {
+    const nodes = shown.filter(({ r }) => r.type === "node");
+    const links = shown.filter(({ r }) => r.kind === "path");
+    el("netCount").textContent = shown.length;
+    el("nodeCount").textContent = nodes.length;
+    el("linkCount").textContent = links.length;
+    fillList(el("nodeList"), nodes, "No nodes yet.",
+      { filter: el("nodeFilter")?.value || "", moreEl: el("nodeMore") });
+    fillList(el("linkList"), links, "No links yet.",
+      { filter: el("linkFilter")?.value || "", moreEl: el("linkMore") });
+    return;
+  }
+
+  el("roomCount").textContent = shown.length;
+  fillList(el("roomList"), shown, "Nothing traced yet.");
 }
 
 const OUTSIDE = "outside";
@@ -1093,6 +1352,7 @@ function uvArea(r) {
  * anything after it says nothing.
  */
 function roomAtUv(uv) {
+  if (!uv) return null;   // not on any drawing, so in no traced room
   const holding = rooms
     .filter((o) => o.kind === "polygon" && o.room && o.type !== "building")
     .filter((o) => uvDistanceToRoom(uv, o) === 0)
@@ -1139,6 +1399,7 @@ function tidyLinks() {
   let selfLinks = 0;
   let dangling = 0;
 
+  forgetNodeIndex();
   rooms = rooms.filter((r) => {
     if (r.kind !== "path") return true;
     const [a, b] = r.nodes || [];
@@ -1167,7 +1428,9 @@ const outlineLabel = (r) => (r.room ? `${r.room} (${r.type})` : `unnumbered ${r.
  */
 function connectOptions(uv, selected, includeOutside) {
   const ranked = rooms
-    .map((r, i) => ({ r, i, d: r.kind === "polygon" ? uvDistanceToRoom(uv, r) : Infinity }))
+    // with no sheet open there is nothing to measure against, so the list is
+    // simply unranked rather than absent
+    .map((r, i) => ({ r, i, d: uv && r.kind === "polygon" ? uvDistanceToRoom(uv, r) : Infinity }))
     .filter((x) => x.r.kind === "polygon")
     .sort((a, b) => a.d - b.d);
 
@@ -1249,8 +1512,11 @@ function fillConnects(item) {
   el("connectALabel").textContent = isNode ? "Serves Room" : "Connects";
   el("connectBField").hidden = isNode;
 
+  // where this marker sits, on the drawing -- null when no sheet is open,
+  // in which case nothing can be ranked by distance to it
+  const here = itemUv(item);
   const nearest = rooms
-    .map((r) => ({ r, d: r.kind === "polygon" && r.room ? uvDistanceToRoom(item.uv, r) : Infinity }))
+    .map((r) => ({ r, d: here && r.kind === "polygon" && r.room ? uvDistanceToRoom(here, r) : Infinity }))
     .sort((a, b) => a.d - b.d)
     .filter((x) => Number.isFinite(x.d))
     .map((x) => x.r.room);
@@ -1307,6 +1573,7 @@ function removeItem(i) {
     });
   }
   rooms = rooms.filter((_, j) => !doomed.has(j));
+  forgetNodeIndex();
   selected = -1;
   closeDialog();
   redrawRooms();
@@ -1346,14 +1613,22 @@ function markDirty() {
 }
 
 async function saveFloor() {
-  if (!current) return;
   el("saveState").textContent = "saving…";
   try {
+    // The network can be worked on with no sheet open -- it spans the campus
+    // -- so with no floor there is simply nothing of a floor to write.
+    if (!current) {
+      const net = await saveNetwork();
+      dirty = false;
+      el("saveState").textContent =
+        `saved ${net.nodes} nodes and ${net.links} links`;
+      await rebuildDerived();
+      return;
+    }
     // Two documents, written separately: this floor's outlines and markers,
     // and the campus network. Writing the network into the sheet is what gave
     // every outdoor node a building and a floor it had nothing to do with.
     const planItems = rooms.filter((r) => !inNetwork(r));
-    const netItems = rooms.filter(inNetwork);
 
     const data = await fetchJson(
       `/admin/api/floor/${current.building}/${current.floor}`, {
@@ -1367,21 +1642,13 @@ async function saveFloor() {
         }),
       });
 
-    const net = await fetchJson("/admin/api/network", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        featureCollection: {
-          type: "FeatureCollection",
-          features: netItems.map(roomFeature).filter(Boolean),
-        },
-      }),
-    });
+    const net = await saveNetwork();
 
     await savePlacement();
     dirty = false;
     el("saveState").textContent =
-      `saved ${data.features} on this floor, ${net.nodes} nodes campus-wide`;
+      `saved ${data.features} on ${current.building} floor ${current.floor}, `
+      + `${net.nodes} nodes and ${net.links} links campus-wide`;
 
     // Saving writes the files; the app reads a search index and a routing
     // graph built FROM those files. Leaving the rebuild as a separate button
@@ -1398,7 +1665,126 @@ async function saveFloor() {
     drawOverview();
   } catch (err) {
     el("saveState").textContent = err.message;
+    // A conflict is the one failure with an obvious next move, and the point
+    // of refusing the save is wasted if the way forward is not offered.
+    if (/changed since you loaded/i.test(err.message)) {
+      const state = el("saveState");
+      const again = document.createElement("button");
+      again.type = "button";
+      again.textContent = "Reload";
+      again.className = "tracer-danger";
+      again.addEventListener("click", () => window.location.reload());
+      state.appendChild(document.createTextNode(" "));
+      state.appendChild(again);
+    }
   }
+}
+
+/**
+ * How a node or a link is identified, and what its contents amount to.
+ *
+ * The key has to match the server's idea of the same thing; the signature is
+ * only ever compared with itself, so it just has to change whenever anything
+ * that gets written changes.
+ */
+function netKey(feature) {
+  const props = feature?.properties || {};
+  if (props.type === "node" && props.nid) return `n:${props.nid}`;
+  if (props.type === "path" && Array.isArray(props.nodes)) {
+    return `p:${[...props.nodes].sort().join("|")}`;
+  }
+  return null;
+}
+
+/** Remember exactly what the server has, so a change can be worked out later. */
+function markNetworkSynced(features, version) {
+  netVersion = Number.isInteger(version) ? version : null;
+  netBaseline = new Map();
+  for (const f of features) {
+    const key = netKey(f);
+    if (key) netBaseline.set(key, JSON.stringify(f));
+  }
+}
+
+/** What changed since the server and this page last agreed. */
+function networkDelta(features) {
+  const add = [];
+  const update = [];
+  const seen = new Set();
+
+  for (const f of features) {
+    const key = netKey(f);
+    if (!key) continue;
+    seen.add(key);
+    const was = netBaseline.get(key);
+    const now = JSON.stringify(f);
+    if (was === undefined) add.push(f);
+    else if (was !== now) update.push(f);
+  }
+
+  const remove = [];
+  for (const key of netBaseline.keys()) {
+    if (!seen.has(key)) remove.push(key);
+  }
+  return { add, update, remove };
+}
+
+/** Write the campus network. Returns what the server says it stored. */
+async function saveNetwork() {
+  if (!networkLoaded) {
+    throw new Error(
+      "The network did not load, so it will not be saved over. Reload the page."
+    );
+  }
+
+  const features = rooms.filter(inNetwork).map(roomFeature).filter(Boolean);
+
+  // The whole document, when there is no agreed starting point to describe a
+  // change against -- the first save, or after anything went sideways. It
+  // always works, whatever size the network has grown to.
+  const writeEverything = async () => {
+    const result = await fetchJson("/admin/api/network", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        featureCollection: { type: "FeatureCollection", features },
+      }),
+    });
+    markNetworkSynced(features, result.version);
+    return result;
+  };
+
+  if (netVersion === null) return writeEverything();
+
+  const { add, update, remove } = networkDelta(features);
+  if (!add.length && !update.length && !remove.length) {
+    return { saved: true, version: netVersion, unchanged: true,
+      nodes: features.filter((f) => f.properties.type === "node").length,
+      links: features.filter((f) => f.properties.type === "path").length };
+  }
+
+  // A change bigger than the thing it changes is not worth describing.
+  if (add.length + update.length > features.length * 0.6) return writeEverything();
+
+  let result;
+  try {
+    result = await fetchJson("/admin/api/network", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ baseVersion: netVersion, add, update, remove }),
+    });
+  } catch (err) {
+    // Someone else -- another tab, most likely -- saved between this page
+    // loading and this save. Refusing is the point: applying "what changed"
+    // to something that has moved is how work disappears. Nothing has been
+    // written, and the message says what to do.
+    if (/changed since you loaded/i.test(err.message)) throw err;
+    // anything else, fall back to the way that cannot be out of step
+    return writeEverything();
+  }
+
+  markNetworkSynced(features, result.version);
+  return result;
 }
 
 async function savePlacement() {
@@ -1422,9 +1808,17 @@ async function savePlacement() {
 async function loadNetwork() {
   let fc;
   try {
-    fc = (await fetchJson("/admin/api/network")).featureCollection;
+    const answer = await fetchJson("/admin/api/network");
+    fc = answer.featureCollection;
+    networkLoaded = true;
+    // what the server has, as the starting point every later save describes
+    // its change against
+    markNetworkSynced(fc?.features || [], answer.version);
   } catch {
-    return []; // nothing traced yet, or the request failed; carry on
+    // Tracing can carry on without it, but saving must not: writing an empty
+    // network over a real one is how hours of work disappears.
+    networkLoaded = false;
+    return [];
   }
   const out = [];
   for (const f of fc?.features || []) {
@@ -1475,6 +1869,7 @@ async function loadPlan(stem) {
   // across the grass, to the door of the next building.
   const [network] = await Promise.all([loadNetwork(), campus.length ? null : loadCampus()]);
 
+  forgetNodeIndex();
   rooms = (data.featureCollection?.features || [])
     .filter((f) => ["Polygon", "Point"].includes(f.geometry?.type))
     .map((f) => {
@@ -1509,7 +1904,6 @@ async function loadPlan(stem) {
   redrawRooms();
 
   el("modeSwitch").hidden = false;
-  el("listBlock").hidden = false;
   el("saveBlock").hidden = false;
   setMode(mode);   // shows the block for whichever mode is current
   // count the two kinds separately: "147 rooms" was neither true nor useful
@@ -1544,6 +1938,24 @@ function drawOverview() {
   // not exist yet
   whenStyleReady(ensureLayers);
 loadCampus();   // the campus is context for everything, so it loads up front
+
+/**
+ * The campus network, ready before any floor is opened.
+ *
+ * It belongs to no floor, so waiting for one made no sense: the panel said
+ * "Network 0" until a sheet was picked, and there was no way to join two
+ * buildings without opening one of them first for no reason.
+ */
+(async () => {
+  const net = await loadNetwork();
+  if (!net.length || rooms.length) return;   // a floor got there first
+  rooms = net;
+  forgetNodeIndex();
+  el("modeSwitch").hidden = false;
+  el("saveBlock").hidden = false;
+  setMode(mode);
+  redrawRooms();
+})();
   const src = map.getSource(OVERVIEW_SRC);
   if (!src) return whenStyleReady(drawOverview);
   const skip = current?.stem;
@@ -1626,7 +2038,10 @@ const loadPlanList = async () => {
   const picker = el("planPicker");
   picker.innerHTML = '<option value="">Choose a Floor…</option>' +
     plans.map((p) => `<option value="${esc(p.stem)}">${esc(p.building)} — floor ${esc(p.floor)}${p.traced ? " ✓" : ""}</option>`).join("");
-  picker.addEventListener("change", () => picker.value && loadPlan(picker.value));
+  picker.addEventListener("change", () => {
+    if (!picker.value) return;
+    loadPlan(picker.value).then(rememberSession);
+  });
 
   if (!plans.length) {
     el("planStatus").textContent =
@@ -1641,6 +2056,8 @@ const loadPlanList = async () => {
   }
   loadOverview();
 
+  // Back to whichever floor was open, looking at what was being looked at.
+  restoreSession();
 };
 
 loadPlanList();
@@ -1739,6 +2156,74 @@ whenStyleReady(ensureLayers);
 // between floors, so it is remembered rather than reset to a default every
 // time a drawing is opened.
 const OPACITY_KEY = "wayfindr.tracer.planOpacity";
+
+// ---------------------------------------------------------------------------
+// Picking up where you left off
+//
+// Tracing a campus is not one sitting. Coming back to a blank picker, the
+// default view and no idea which floor you were on costs a minute of hunting
+// every time, so the floor, the mode and where you were looking are kept.
+// Local to this browser, like the transparency setting above: it is how you
+// were working, not part of the data.
+// ---------------------------------------------------------------------------
+const SESSION_KEY = "wayfindr.tracer.session";
+
+function rememberSession() {
+  try {
+    const c = map.getCenter();
+    localStorage.setItem(SESSION_KEY, JSON.stringify({
+      stem: current?.stem || null,
+      mode,
+      lng: Number(c.lng.toFixed(6)),
+      lat: Number(c.lat.toFixed(6)),
+      zoom: Number(map.getZoom().toFixed(2)),
+      bearing: Number(map.getBearing().toFixed(1)),
+    }));
+  } catch { /* private mode; nothing to remember with */ }
+}
+
+function lastSession() {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+// Panning and zooming happen constantly; writing on every frame would be
+// silly, so the view is written once things settle.
+let sessionTimer = null;
+map.on("moveend", () => {
+  clearTimeout(sessionTimer);
+  sessionTimer = setTimeout(rememberSession, 400);
+});
+
+/**
+ * Reopen the floor that was open last, looking at what was being looked at.
+ *
+ * The camera is restored after the plan loads, because opening a plan moves
+ * the map to it -- which is right the first time and wrong every time after.
+ */
+async function restoreSession() {
+  const saved = lastSession();
+  if (!saved) return;
+
+  if (saved.mode === "network" || saved.mode === "plan") setMode(saved.mode);
+
+  if (saved.stem && plans.some((pl) => pl.stem === saved.stem)) {
+    el("planPicker").value = saved.stem;
+    await loadPlan(saved.stem);
+  }
+
+  if (Number.isFinite(saved.lng) && Number.isFinite(saved.lat)) {
+    map.jumpTo({
+      center: [saved.lng, saved.lat],
+      zoom: Number.isFinite(saved.zoom) ? saved.zoom : map.getZoom(),
+      bearing: Number.isFinite(saved.bearing) ? saved.bearing : 0,
+    });
+  }
+}
 
 function planOpacity() {
   return Number(el("opacity").value) / 100;
@@ -1875,10 +2360,20 @@ const beginDrawing = () => {
 };
 
 el("startDraw").addEventListener("click", beginDrawing);
+for (const id of ["nodeFilter", "linkFilter"]) {
+  el(id).addEventListener("input", () => renderRoomList());
+}
+
+el("doneNetDraw").addEventListener("click", () => {
+  cancelDraft();
+  setDrawHint(activeType() === "node"
+    ? "Done placing. Click Place Nodes to add more."
+    : "Done linking. Click Link Nodes to join more.");
+});
 el("startNetDraw").addEventListener("click", beginDrawing);
 
-el("modePlan").addEventListener("click", () => setMode("plan"));
-el("modeNetwork").addEventListener("click", () => setMode("network"));
+el("modePlan").addEventListener("click", () => { setMode("plan"); rememberSession(); });
+el("modeNetwork").addEventListener("click", () => { setMode("network"); rememberSession(); });
 function networkButtonLabel() {
   const t = activeType();
   if (t === "node") return "Place Nodes";
@@ -1941,7 +2436,10 @@ async function rebuildDerived() {
   state.textContent = "rebuilding…";
   try {
     const data = await fetchJson("/admin/api/rebuild", { method: "POST" });
-    state.textContent = `${data.rooms} rooms searchable, ${data.buildings} buildings routable`;
+    // "places" rather than "buildings": a car park is somewhere you can be
+    // routed to and is counted here, and it is not a building.
+    state.textContent = `${data.rooms} rooms searchable, ${data.buildings} `
+      + `places routable, ${data.nodes} nodes linked by ${data.links} paths`;
   } catch (err) {
     state.textContent = err.message;
   } finally {

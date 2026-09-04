@@ -79,6 +79,32 @@ describe("errorHandler Middleware", () => {
     expect(mockLoggerError).toHaveBeenCalledWith("GET /test -> too late");
   });
 
+  // body-parser rejects a malformed body with its own wording ("Unexpected
+  // token 'n'..."), which tells the caller nothing they can act on.
+  test("turns a malformed body into a 400 that says so", async () => {
+    const err = Object.assign(new SyntaxError("Unexpected token 'n'"), {
+      type: "entity.parse.failed",
+    });
+
+    await errorHandler(err, req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({
+      error: true,
+      message: "The request body was not valid JSON.",
+    });
+  });
+
+  test("says plainly when a request body is too large", async () => {
+    const err = Object.assign(new Error("request entity too large"), {
+      type: "entity.too.large",
+    });
+
+    await errorHandler(err, req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(413);
+  });
+
   test("defaults message if none provided", async () => {
     const err = {};
     await errorHandler(err, req, res, next);

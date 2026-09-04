@@ -151,6 +151,10 @@
         </label>
         <div class="tracer-row">
           <button type="button" id="startNetDraw" class="tracer-primary">Place Nodes</button>
+          <!-- Placing nodes and drawing links both keep going until you say
+               stop, so there has to be a stop. Esc does it too, but a button
+               is the thing you can see. -->
+          <button type="button" id="doneNetDraw" hidden>Done</button>
         </div>
         <p class="tracer-hint" id="netHint">
           Click where someone can stand. A node inside a building belongs to
@@ -163,9 +167,30 @@
         <p class="tracer-hint" id="netToolsResult" hidden></p>
       </section>
 
-      <!-- ------------------------------- The list ------------------------- -->
+      <!-- ------------------------------- The lists ------------------------ -->
+      <!-- Nodes and links are different things and there are hundreds of
+           each; one scroller holding both meant scrolling past two hundred
+           links to reach the nodes. Each gets its own, and each scrolls on
+           its own. -->
       <section class="tracer-block" id="listBlock" hidden>
         <ul class="tracer-rooms" id="roomList"></ul>
+      </section>
+
+      <section class="tracer-block" id="netListBlock" hidden>
+        <h4 class="tracer-subhead">Nodes <span class="tracer-count" id="nodeCount">0</span></h4>
+        <!-- With thousands of nodes, scrolling to find one is not a way of
+             finding anything. Only a page of rows is drawn, and this is how
+             you narrow it. -->
+        <input type="search" id="nodeFilter" class="tracer-filter"
+               placeholder="Filter nodes…" autocomplete="off" aria-label="Filter nodes">
+        <ul class="tracer-rooms tracer-rooms-half" id="nodeList"></ul>
+        <p class="tracer-hint" id="nodeMore" hidden></p>
+
+        <h4 class="tracer-subhead">Links <span class="tracer-count" id="linkCount">0</span></h4>
+        <input type="search" id="linkFilter" class="tracer-filter"
+               placeholder="Filter links…" autocomplete="off" aria-label="Filter links">
+        <ul class="tracer-rooms tracer-rooms-half" id="linkList"></ul>
+        <p class="tracer-hint" id="linkMore" hidden></p>
       </section>
 
       <!-- ------------------------------- Saving --------------------------- -->

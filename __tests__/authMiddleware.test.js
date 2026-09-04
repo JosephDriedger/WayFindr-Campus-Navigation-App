@@ -70,6 +70,34 @@ describe("Auth Middleware", () => {
   });
 
   // checkSession tests
+  // fetch() sends "*/*" unless told otherwise, so an API call was being
+  // answered with a redirect to an HTML login page and the caller got a lump
+  // of markup where it expected JSON.
+  test("answers an /api/ call with JSON even when it asks for anything", async () => {
+    req.headers.accept = "*/*";
+    req.originalUrl = "/api/favorites";
+    await middleware.verifyFirebaseToken(req, res, next);
+    expect(res.redirect).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json).toHaveBeenCalledWith({ error: "Not authenticated" });
+  });
+
+  test("still sends a person opening a page to the login screen", async () => {
+    req.headers.accept = "text/html";
+    req.originalUrl = "/favorites";
+    await middleware.verifyFirebaseToken(req, res, next);
+    expect(res.redirect).toHaveBeenCalledWith("/auth/login");
+  });
+
+  test("checkSession answers an /api/ call with JSON", () => {
+    req.headers.accept = "*/*";
+    req.originalUrl = "/api/schedule";
+    req.session = {};
+    middleware.checkSession(req, res, next);
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.redirect).not.toHaveBeenCalled();
+  });
+
   test("checkSession calls next() when session user exists", () => {
     req.session.user = { uid: "123" };
     middleware.checkSession(req, res, next);

@@ -442,3 +442,37 @@ body.tracer-body {
 .tracer-details[open] > summary {
   margin-bottom: 6px;
 }
+
+/* Nodes and links each get their own scroller, so neither buries the other. */
+.tracer-rooms-half {
+  max-height: 34vh;
+}
+
+.tracer-subhead {
+  margin: 10px 0 4px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #475569;
+}
+
+.tracer-subhead:first-child {
+  margin-top: 0;
+}
+
+.tracer-filter {
+  width: 100%;
+  margin: 0 0 6px;
+  padding: 6px 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 13px;
+}
+
+.tracer-filter:focus {
+  outline: 2px solid #93c5fd;
+  outline-offset: -1px;
+}
+

@@ -42,6 +42,18 @@ const ROOM_ENTRY_PENALTY_M = 1000;
 // outline, so no type) is left alone rather than guessed at.
 const NOT_THOROUGHFARE = new Set(["room", "service"]);
 
+/**
+ * A caller's own words, trimmed to a length worth putting in a sentence.
+ *
+ * What was asked for is echoed back so the answer says which room could not
+ * be found -- but it arrives from a request and can be any length at all, and
+ * a five thousand character error message helps nobody.
+ */
+function quoted(text) {
+  const one = String(text ?? "").replace(/\s+/g, " ").trim();
+  return one.length > 60 ? `${one.slice(0, 57)}...` : one;
+}
+
 /** Metres between two [lng, lat] points. */
 function haversine([lng1, lat1], [lng2, lat2]) {
   const toRad = (d) => (d * Math.PI) / 180;
@@ -160,8 +172,12 @@ function nodesFor(graph, building, room) {
   if (!wanted || wanted.toUpperCase() === building) {
     return graph.byBuilding.get(building) || [];
   }
-  // "SW3-1615" typed into a box that already knows the building
-  const bare = wanted.replace(new RegExp(`^${building}[-\\s]*`, "i"), "");
+  // "SW3-1615" typed into a box that already knows the building. The name
+  // goes into a pattern, and place names are data -- "Drop off/Pick up Only"
+  // is a real one -- so it is escaped rather than trusted to contain nothing
+  // a regular expression cares about.
+  const literal = building.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const bare = wanted.replace(new RegExp(`^${literal}[-\\s]*`, "i"), "");
   return graph.byRoom.get(graph.key(building, bare))
     || graph.byRoom.get(graph.key(building, wanted))
     || [];
@@ -265,7 +281,8 @@ export function findIndoorPath(building, startRoom, goalRoom) {
   // one being looked at: "SW3-1990 to SW7" crosses the campus, it does not
   // look for a room called SW7 in SW3.
   const asBuilding = (ref) => {
-    const text = String(ref ?? "").trim().toUpperCase();
+    // collapse repeated spaces so "LOT  A" and "LOT A" are the same place
+    const text = String(ref ?? "").trim().toUpperCase().replace(/\s+/g, " ");
     return graph.buildings.has(text) ? { building: text, room: "" } : null;
   };
   const from = asBuilding(startRoom) || parseRef(startRoom, code);
@@ -274,8 +291,8 @@ export function findIndoorPath(building, startRoom, goalRoom) {
   const goals = nodesFor(graph, to.building, to.room);
 
   const missing = [
-    !starts.length && (startRoom || from.building),
-    !goals.length && (goalRoom || to.building),
+    !starts.length && quoted(startRoom || from.building),
+    !goals.length && quoted(goalRoom || to.building),
   ].filter(Boolean);
   if (missing.length) {
     // Naming what is missing matters: a room with no node is a room nobody
@@ -301,6 +318,13 @@ export function findIndoorPath(building, startRoom, goalRoom) {
     lng: n.lng,
     lat: n.lat,
   });
+
+  // Nothing asked for is not the same as asking for where you already are.
+  // A building destination arrives as its own name, so an empty goal really
+  // is empty rather than "the building I am in".
+  if (!String(goalRoom ?? "").trim()) {
+    return { success: false, message: "No destination given." };
+  }
 
   const shared = starts.filter((s) => goals.includes(s));
   if (shared.length) {
