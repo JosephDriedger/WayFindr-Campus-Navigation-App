@@ -110,6 +110,7 @@ const IMG_SRC = "plan-image";
 const ROOMS_SRC = "traced-rooms";
 const MARKS_SRC = "traced-marks";
 const PATHS_SRC = "traced-paths";
+const CAMPUS_SRC = "campus-buildings";
 const OVERVIEW_SRC = "traced-overview";
 const DRAFT_SRC = "draft-room";
 
@@ -170,12 +171,24 @@ const emptyFC = () => ({ type: "FeatureCollection", features: [] });
  * state directly cannot miss, whichever order things happen in.
  */
 function whenStyleReady(fn) {
-  if (map.isStyleLoaded()) return fn();
-  const timer = setInterval(() => {
-    if (!map.isStyleLoaded()) return;
+  // isStyleLoaded() is false until every source in the style has loaded too,
+  // which in a background or throttled tab may be never -- and then nothing
+  // gets drawn at all. What actually has to be true before addSource and
+  // addLayer is that the style itself is parsed, which is what style._loaded
+  // says and what the 'style.load' event announces.
+  const ready = () => map.isStyleLoaded() || map.style?._loaded === true;
+  if (ready()) return fn();
+  // the poll and the event can both come good; whichever is first wins, and
+  // the other must not run the callback a second time
+  let done = false;
+  const run = () => {
+    if (done || !ready()) return;
+    done = true;
     clearInterval(timer);
     fn();
-  }, 60);
+  };
+  const timer = setInterval(run, 60);
+  map.once("style.load", run);
   return undefined;
 }
 
@@ -231,6 +244,29 @@ function ensureLayers() {
       },
     });
   }
+  if (!map.getSource(CAMPUS_SRC)) {
+    // Every building on campus, faintly, underneath everything. The network
+    // is campus-wide now, so tracing a path to SW7 means being able to see
+    // where SW7 is -- without this you are placing nodes on blank ground and
+    // hoping.
+    map.addSource(CAMPUS_SRC, { type: "geojson", data: emptyFC() });
+    map.addLayer({
+      id: "campus-fill", type: "fill", source: CAMPUS_SRC,
+      paint: { "fill-color": "#60a5fa", "fill-opacity": 0.08 },
+    });
+    map.addLayer({
+      id: "campus-line", type: "line", source: CAMPUS_SRC,
+      paint: { "line-color": "#2563eb", "line-width": 1, "line-opacity": 0.35 },
+    });
+    map.addLayer({
+      id: "campus-label", type: "symbol", source: CAMPUS_SRC,
+      layout: { "text-field": ["get", "BuildingName"], "text-size": 11 },
+      paint: {
+        "text-color": "#1d4ed8", "text-opacity": 0.55,
+        "text-halo-color": "#fff", "text-halo-width": 1.2,
+      },
+    });
+  }
   if (!map.getSource(OVERVIEW_SRC)) {
     // Everything already traced, campus-wide, sitting under the working
     // layers. Without it the tracer opens on a blank map and there is no way
@@ -253,8 +289,15 @@ function ensureLayers() {
     });
     map.addLayer({
       id: "overview-label", type: "symbol", source: OVERVIEW_SRC,
-      filter: ["==", ["geometry-type"], "Polygon"],
-      layout: { "text-field": ["get", "stem"], "text-size": 11 },
+      // One label per floor, on the marker made for it -- writing the sheet
+      // name across every room on the sheet said the same thing forty times
+      // and told you nothing about any of them.
+      filter: ["==", ["get", "kind"], "sheet-label"],
+      layout: {
+        "text-field": ["get", "label"],
+        "text-size": 12,
+        "text-allow-overlap": true,
+      },
       paint: {
         "text-color": "#334155", "text-halo-color": "#fff", "text-halo-width": 1.5,
       },
@@ -282,22 +325,37 @@ const round6 = ([u, v]) => [Number(u.toFixed(6)), Number(v.toFixed(6))];
 
 const nodeById = (nid) => rooms.find((r) => r.nid === nid);
 
+/**
+ * Where an item is, in the world.
+ *
+ * Plan items are held in plan space so they move with the drawing they were
+ * traced on. Network items are held in world coordinates, because a path
+ * across the campus belongs to no drawing and must not move when one is
+ * nudged into place.
+ */
+function itemLngLat(r) {
+  return r.ll ? r.ll : uvToLngLat(r.uv);
+}
+
+/** The same position in plan space, which is what the drawing code works in. */
+function itemUv(r) {
+  return r.ll ? lngLatToUv(r.ll) : r.uv;
+}
+
 function pathFeature(r) {
   const a = nodeById(r.nodes[0]);
   const b = nodeById(r.nodes[1]);
   if (!a || !b) return null; // an endpoint was deleted
   return {
     type: "Feature",
-    properties: {
-      room: null, building: current.building, floor: current.floor,
-      type: "path", source: "traced", nodes: [...r.nodes],
-    },
-    geometry: { type: "LineString", coordinates: [uvToLngLat(a.uv), uvToLngLat(b.uv)] },
+    properties: { type: "path", nodes: [...r.nodes] },
+    geometry: { type: "LineString", coordinates: [itemLngLat(a), itemLngLat(b)] },
   };
 }
 
 function roomFeature(r) {
   if (r.kind === "path") return pathFeature(r);
+  if (r.type === "node") return nodeFeature(r);
   const props = {
     room: r.room || null, building: current.building, floor: current.floor,
     type: r.type || "room", source: "traced",
@@ -385,6 +443,77 @@ function displayNames() {
 
 let names = [];
 
+// The campus footprints, so a node can say which building it stands in rather
+// than inheriting one from whichever sheet was open. Loaded once; until it
+// arrives a node simply has no building, which is corrected the moment it is
+// dragged or the page is opened again.
+let campus = [];
+
+async function loadCampus() {
+  try {
+    const fc = await fetchJson("/data/bcit-coordinates.geojson");
+    whenStyleReady(() => {
+      ensureLayers();
+      map.getSource(CAMPUS_SRC)?.setData({
+        type: "FeatureCollection",
+        features: (fc.features || []).filter((f) => (f.properties || {}).BuildingName),
+      });
+    });
+    campus = (fc.features || [])
+      .map((f) => ({
+        name: (f.properties || {}).BuildingName,
+        rings: f.geometry.type === "Polygon"
+          ? [f.geometry.coordinates[0]]
+          : (f.geometry.coordinates || []).map((poly) => poly[0]),
+      }))
+      .filter((b) => b.name && b.rings.length);
+  } catch {
+    campus = []; // the tracer works without it; nodes just carry no building
+  }
+}
+
+function inRing(ring, [x, y]) {
+  let inside = false;
+  for (let i = 0; i < ring.length; i += 1) {
+    const j = (i - 1 + ring.length) % ring.length;
+    const [xi, yi] = ring[i];
+    const [xj, yj] = ring[j];
+    if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+/** The building a world position falls in, or null for outdoors. */
+function buildingAt(lngLat) {
+  for (const b of campus) {
+    if (b.rings.some((r) => inRing(r, lngLat))) return b.name;
+  }
+  return null;
+}
+
+/**
+ * A walking node, as it is stored: a position in the world, the building it
+ * stands in and the space it serves. No plan-space coordinates and no source
+ * sheet -- the node is not part of a drawing.
+ */
+function nodeFeature(r) {
+  return {
+    type: "Feature",
+    properties: {
+      type: "node",
+      nid: r.nid,
+      // which building it is in is a fact about where it stands, so it is
+      // read from the campus outlines rather than from the sheet being traced
+      building: r.building ?? buildingAt(itemLngLat(r)),
+      floor: r.floor ?? null,
+      room: r.room || null,
+    },
+    geometry: { type: "Point", coordinates: itemLngLat(r) },
+  };
+}
+
 /** The map copy of an item, tagged with where it lives in the list. */
 function renderFeature(r, i) {
   const f = roomFeature(r);
@@ -439,17 +568,16 @@ function setMode(next) {
   mode = next;
   selected = -1;
   cancelDraft();
+  setAdjusting(false);   // positioning the drawing is a floor-plan job
   el("modePlan").classList.toggle("is-active", next === "plan");
   el("modeNetwork").classList.toggle("is-active", next === "network");
-  el("planTypeField").hidden = next !== "plan";
-  el("netTypeField").hidden = next !== "network";
-  el("netTools").hidden = next !== "network";
+  // one task on screen at a time: the whole block for the other one goes
+  el("planMode").hidden = next !== "plan";
+  el("networkMode").hidden = next !== "network";
   el("netToolsResult").hidden = true;
-  el("tracedHeading").firstChild.textContent =
-    next === "network" ? "Network " : "Traced ";
-  el("startDraw").textContent = networkButtonLabel();
+  el("startNetDraw").textContent = networkButtonLabel();
   setDrawHint(next === "network"
-    ? "Place nodes where people walk, then link them."
+    ? "Click where someone can stand. A node inside a building belongs to it."
     : "Click each corner, then Finish. Double-click also closes it.");
   applyModeStyling();
   renderRoomList();
@@ -661,13 +789,30 @@ function snappedUv(lngLat) {
   return best ? [best[0], best[1]] : lngLatToUv([lngLat.lng, lngLat.lat]);
 }
 
+/**
+ * Any marker under the pointer -- a node, a doorway, an entrance -- as an
+ * index into the list. Only ones belonging to the mode being worked on, so
+ * dragging a room's doorway while tracing the network is not possible.
+ */
+function pointIndexNear(lngLat) {
+  const here = map.project(lngLat);
+  let best = -1, bestD = SNAP_PX;
+  rooms.forEach((r, i) => {
+    if (r.kind !== "point" || !itemInMode(r)) return;
+    const p = map.project(itemLngLat(r));
+    const d = Math.hypot(p.x - here.x, p.y - here.y);
+    if (d <= bestD) { bestD = d; best = i; }
+  });
+  return best;
+}
+
 /** The walking node under the pointer, if there is one. */
 function nodeNear(lngLat) {
   const here = map.project(lngLat);
   let best = null, bestD = SNAP_PX;
   for (const r of rooms) {
     if (r.kind !== "point" || r.type !== "node") continue;
-    const p = map.project(uvToLngLat(r.uv));
+    const p = map.project(itemLngLat(r));
     const d = Math.hypot(p.x - here.x, p.y - here.y);
     if (d <= bestD) { bestD = d; best = r; }
   }
@@ -717,6 +862,10 @@ function selectItem(i) {
 }
 
 function onMapClick(e) {
+  // A drag finishes with a click. Without this, letting go of a node you had
+  // just moved counted as a click on the map -- which in the link tool
+  // started a link, and with the node tool tried to drop another node.
+  if (dragMoved) { dragMoved = false; return; }
   // not drawing: a click picks up whatever is under it, which is how you edit
   // or delete one of many identical nodes without hunting through the list
   if (adjusting) return;
@@ -786,9 +935,17 @@ function onMapClick(e) {
     // A node dropped inside a room is a node FOR that room -- which is what
     // makes it routable -- so it takes the name of whatever it lands on
     // rather than waiting to be told afterwards.
-    const uv = lngLatToUv([e.lngLat.lng, e.lngLat.lat]);
-    const servedRoom = roomAtUv(uv);
-    rooms.push({ kind: "point", type: "node", nid: newNodeId(), uv, room: servedRoom });
+    const ll = [e.lngLat.lng, e.lngLat.lat];
+    const servedRoom = roomAtUv(lngLatToUv(ll));
+    rooms.push({
+      kind: "point", type: "node", nid: newNodeId(),
+      // world coordinates: a node is part of the campus network, not of the
+      // drawing that happened to be open when it was placed
+      ll,
+      room: servedRoom,
+      building: buildingAt(ll),
+      floor: buildingAt(ll) === current.building ? current.floor : null,
+    });
     redrawRooms();
     markDirty();
     const n = rooms.filter((r) => r.type === "node").length;
@@ -812,7 +969,10 @@ function onMapClick(e) {
   redrawDraft();
 }
 
-function setDrawHint(text) { el("drawHint").textContent = text; }
+function setDrawHint(text) {
+  const target = mode === "network" ? el("netHint") : el("drawHint");
+  if (target) target.textContent = text;
+}
 
 function setDrafting(on) {
   // a marker is one click, so it has nothing to finish or undo
@@ -820,6 +980,7 @@ function setDrafting(on) {
   const t = activeType();
   el("draftControls").hidden = !on || isPointType(t) || isLinkType(t);
   el("startDraw").disabled = on;
+  el("startNetDraw").disabled = on;
   // double-click finishes a room, so it must not also zoom the map
   if (on) map.doubleClickZoom.disable(); else map.doubleClickZoom.enable();
   map.getCanvas().style.cursor = on ? "crosshair" : "";
@@ -848,7 +1009,8 @@ function cancelDraft() {
 function renderRoomList() {
   const list = el("roomList");
   const shown = rooms.map((r, i) => ({ r, i })).filter(({ r }) => itemInMode(r));
-  el("roomCount").textContent = shown.length;
+  const counter = mode === "network" ? el("netCount") : el("roomCount");
+  if (counter) counter.textContent = shown.length;
 
   // In the order they were traced, the list is the order you happened to work
   // in -- which is no order at all once there are two hundred rows. Sorted by
@@ -956,7 +1118,7 @@ function autoNameNodes() {
   for (const r of rooms) {
     if (r.kind !== "point" || r.type !== "node") continue;
     if (r.room) { already += 1; continue; }
-    const found = roomAtUv(r.uv);
+    const found = roomAtUv(itemUv(r));
     if (found) { r.room = found; named += 1; } else { outside += 1; }
   }
   if (named) { redrawRooms(); markDirty(); }
@@ -1096,15 +1258,15 @@ function fillConnects(item) {
   // a new marker is pre-filled with what it sits between, which is right far
   // more often than not, and can be corrected in the dropdown
   if (isNode) {
-    el("connectA").innerHTML = connectOptions(item.uv, item.room || "", false);
+    el("connectA").innerHTML = connectOptions(itemUv(item), item.room || "", false);
     return;
   }
   const [a, b] = item.connects || [
     nearest[0] || "",
     item.type === "entrance" ? OUTSIDE : (nearest[1] || ""),
   ];
-  el("connectA").innerHTML = connectOptions(item.uv, a, item.type === "entrance");
-  el("connectB").innerHTML = connectOptions(item.uv, b, item.type === "entrance");
+  el("connectA").innerHTML = connectOptions(itemUv(item), a, item.type === "entrance");
+  el("connectB").innerHTML = connectOptions(itemUv(item), b, item.type === "entrance");
 }
 
 /** Bring an item into view without changing the zoom more than needed. */
@@ -1113,12 +1275,14 @@ function zoomToItem(i) {
   if (!r) return;
   if (r.kind === "path") {
     const a = nodeById(r.nodes[0]);
-    if (a) map.easeTo({ center: uvToLngLat(a.uv), duration: 400 });
+    if (a) map.easeTo({ center: itemLngLat(a), duration: 400 });
     return;
   }
-  const pts = r.kind === "point" ? [r.uv] : r.uv;
-  const lngs = pts.map((uv) => uvToLngLat(uv)[0]);
-  const lats = pts.map((uv) => uvToLngLat(uv)[1]);
+  const coords = r.kind === "point"
+    ? [itemLngLat(r)]
+    : r.uv.map((uv) => uvToLngLat(uv));
+  const lngs = coords.map((c) => c[0]);
+  const lats = coords.map((c) => c[1]);
   map.easeTo({
     center: [(Math.min(...lngs) + Math.max(...lngs)) / 2,
       (Math.min(...lats) + Math.max(...lats)) / 2],
@@ -1185,22 +1349,50 @@ async function saveFloor() {
   if (!current) return;
   el("saveState").textContent = "saving…";
   try {
+    // Two documents, written separately: this floor's outlines and markers,
+    // and the campus network. Writing the network into the sheet is what gave
+    // every outdoor node a building and a floor it had nothing to do with.
+    const planItems = rooms.filter((r) => !inNetwork(r));
+    const netItems = rooms.filter(inNetwork);
+
     const data = await fetchJson(
       `/admin/api/floor/${current.building}/${current.floor}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          featureCollection: { type: "FeatureCollection", features: rooms.map(roomFeature) },
+          featureCollection: {
+            type: "FeatureCollection",
+            features: planItems.map(roomFeature).filter(Boolean),
+          },
         }),
       });
+
+    const net = await fetchJson("/admin/api/network", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        featureCollection: {
+          type: "FeatureCollection",
+          features: netItems.map(roomFeature).filter(Boolean),
+        },
+      }),
+    });
+
     await savePlacement();
     dirty = false;
-    el("saveState").textContent = `saved ${data.features} rooms`;
+    el("saveState").textContent =
+      `saved ${data.features} on this floor, ${net.nodes} nodes campus-wide`;
+
+    // Saving writes the files; the app reads a search index and a routing
+    // graph built FROM those files. Leaving the rebuild as a separate button
+    // meant tracing a node into SW7, saving, and still being told SW7 had no
+    // node -- true of the graph, and nothing to do with what you had drawn.
+    await rebuildDerived();
     const plan = plans.find((p) => p.stem === current.stem);
     if (plan) plan.traced = true;
     // what was just written is now part of the overview for other floors
     overviewFeatures = overviewFeatures.filter((f) => f.properties.stem !== current.stem)
-      .concat(rooms.map(roomFeature).filter(Boolean).map((f) => ({
+      .concat(planItems.map(roomFeature).filter(Boolean).map((f) => ({
         ...f, properties: { ...f.properties, stem: current.stem },
       })));
     drawOverview();
@@ -1221,6 +1413,37 @@ async function savePlacement() {
 // ---------------------------------------------------------------------------
 // Loading
 // ---------------------------------------------------------------------------
+/**
+ * The campus walking network, as working items.
+ *
+ * Held in world coordinates, so repositioning a floor plan leaves it exactly
+ * where it is -- which is the point of keeping it out of the sheets.
+ */
+async function loadNetwork() {
+  let fc;
+  try {
+    fc = (await fetchJson("/admin/api/network")).featureCollection;
+  } catch {
+    return []; // nothing traced yet, or the request failed; carry on
+  }
+  const out = [];
+  for (const f of fc?.features || []) {
+    const p = f.properties || {};
+    if (p.type === "node" && f.geometry?.type === "Point") {
+      out.push({
+        kind: "point", type: "node", nid: p.nid,
+        ll: f.geometry.coordinates,
+        room: p.room || null,
+        building: p.building || null,
+        floor: p.floor || null,
+      });
+    } else if (p.type === "path" && Array.isArray(p.nodes) && p.nodes.length === 2) {
+      out.push({ kind: "path", nodes: p.nodes });
+    }
+  }
+  return out;
+}
+
 async function loadPlan(stem) {
   if (dirty && !confirm("This floor has unsaved changes. Leave anyway?")) return;
   current = plans.find((p) => p.stem === stem);
@@ -1246,15 +1469,15 @@ async function loadPlan(stem) {
   // attached to the drawing. Anything else -- a floor drawn before this tool
   // existed -- has only world coordinates, so those are read back through the
   // current placement and become editable the same way.
+  // The plan and the network are two different documents. The plan is this
+  // floor; the network is the whole campus, and the same network is there
+  // whichever sheet you open -- so you can trace a path from a door, out
+  // across the grass, to the door of the next building.
+  const [network] = await Promise.all([loadNetwork(), campus.length ? null : loadCampus()]);
+
   rooms = (data.featureCollection?.features || [])
-    .filter((f) => ["Polygon", "Point", "LineString"].includes(f.geometry?.type))
+    .filter((f) => ["Polygon", "Point"].includes(f.geometry?.type))
     .map((f) => {
-      if (f.geometry.type === "LineString") {
-        const nodes = f.properties?.nodes;
-        return Array.isArray(nodes) && nodes.length === 2
-          ? { kind: "path", nodes }
-          : null;
-      }
       const p = f.properties || {};
       const common = {
         room: p.room || null, type: p.type || "room", name: p.name || undefined,
@@ -1276,7 +1499,8 @@ async function loadPlan(stem) {
         ...common,
       };
     })
-    .filter(Boolean);
+    .filter(Boolean)
+    .concat(network);
 
   dirty = false;
   selected = -1;
@@ -1284,8 +1508,10 @@ async function loadPlan(stem) {
   applyPlacement();
   redrawRooms();
 
-  el("placeBlock").hidden = false;
-  el("drawBlock").hidden = false;
+  el("modeSwitch").hidden = false;
+  el("listBlock").hidden = false;
+  el("saveBlock").hidden = false;
+  setMode(mode);   // shows the block for whichever mode is current
   // count the two kinds separately: "147 rooms" was neither true nor useful
   // when 102 of them were walking nodes
   const outlines = rooms.filter((r) => r.kind === "polygon").length;
@@ -1317,13 +1543,36 @@ function drawOverview() {
   // the overview is fetched independently of the map style, so its layers may
   // not exist yet
   whenStyleReady(ensureLayers);
+loadCampus();   // the campus is context for everything, so it loads up front
   const src = map.getSource(OVERVIEW_SRC);
   if (!src) return whenStyleReady(drawOverview);
   const skip = current?.stem;
-  src.setData({
-    type: "FeatureCollection",
-    features: overviewFeatures.filter((f) => f.properties.stem !== skip),
-  });
+  const shown = overviewFeatures.filter((f) => f.properties.stem !== skip);
+
+  // A label per sheet, placed in the middle of what has been traced on it.
+  const bounds = new Map();
+  for (const f of shown) {
+    if (f.geometry?.type !== "Polygon") continue;
+    const stem = f.properties.stem;
+    const b = bounds.get(stem) || { x0: 180, y0: 90, x1: -180, y1: -90 };
+    for (const [x, y] of f.geometry.coordinates[0]) {
+      b.x0 = Math.min(b.x0, x); b.y0 = Math.min(b.y0, y);
+      b.x1 = Math.max(b.x1, x); b.y1 = Math.max(b.y1, y);
+    }
+    bounds.set(stem, b);
+  }
+  const labels = [...bounds.entries()].map(([stem, b]) => ({
+    type: "Feature",
+    properties: {
+      stem,
+      kind: "sheet-label",
+      // "SW3-Floor1" is a file name; "SW3 · Floor 1" is what it is
+      label: stem.replace(/-Floor/, " · Floor "),
+    },
+    geometry: { type: "Point", coordinates: [(b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2] },
+  }));
+
+  src.setData({ type: "FeatureCollection", features: [...shown, ...labels] });
 }
 
 /**
@@ -1401,6 +1650,80 @@ loadPlanList();
 // before it runs, and anything hung off map.on("load") would then be waiting
 // on an event that has already been and gone -- which is exactly how clicking
 // on the plan silently did nothing.
+// ---------------------------------------------------------------------------
+// Moving a marker
+//
+// A node in slightly the wrong place used to mean deleting it and placing
+// another -- which threw away its id, and with it every link that named it.
+// Dragging keeps the id, so the links follow the node instead of breaking.
+// ---------------------------------------------------------------------------
+let dragIndex = -1;
+let dragMoved = false;
+
+map.on("mousedown", (e) => {
+  // not while drawing, and not while the plan itself is being positioned
+  if (draft || adjusting) return;
+  const i = pointIndexNear(e.lngLat);
+  if (i < 0) return;
+  dragIndex = i;
+  dragMoved = false;
+  // the map must not pan out from under the marker being dragged
+  map.dragPan.disable();
+  map.getCanvas().style.cursor = "grabbing";
+  e.preventDefault?.();
+});
+
+map.on("mousemove", (e) => {
+  if (dragIndex < 0) {
+    // only offer the grab cursor when there is something to grab
+    if (!draft && !adjusting) {
+      const over = pointIndexNear(e.lngLat) >= 0;
+      map.getCanvas().style.cursor = over ? "grab" : "";
+    }
+    return;
+  }
+  dragMoved = true;
+  const item = rooms[dragIndex];
+  // a network node lives in the world; a marker lives on the drawing
+  if (item.ll) item.ll = [e.lngLat.lng, e.lngLat.lat];
+  else item.uv = lngLatToUv([e.lngLat.lng, e.lngLat.lat]);
+  // redraw as it moves, so the links to it stretch with it and you can see
+  // what the network will look like before letting go
+  redrawRooms();
+});
+
+map.on("mouseup", () => {
+  if (dragIndex < 0) return;
+  const moved = dragMoved;
+  const r = rooms[dragIndex];
+  dragIndex = -1;
+  map.dragPan.enable();
+  map.getCanvas().style.cursor = "";
+  if (!moved) return;
+
+  // A node that has been moved may now be standing in a different space, and
+  // what it serves is what makes it routable, so it is re-read rather than
+  // left saying it serves the room it used to be in.
+  if (r.type === "node") {
+    // and it may now stand in a different building, which is what makes it
+    // reachable when someone asks for that building
+    r.building = buildingAt(itemLngLat(r));
+    const served = roomAtUv(itemUv(r));
+    if (served !== r.room) {
+      r.room = served;
+      setDrawHint(served
+        ? `Moved -- this node now serves ${served}.`
+        : "Moved -- this node is no longer inside a numbered outline.");
+    } else {
+      setDrawHint("Moved.");
+    }
+  } else {
+    setDrawHint("Moved.");
+  }
+  redrawRooms();
+  markDirty();
+});
+
 map.on("click", onMapClick);
 map.on("dblclick", (e) => {
   if (adjusting || !draft) return;
@@ -1538,7 +1861,7 @@ el("fitBuilding").addEventListener("click", fitToBuilding);
 el("zoomPlan").addEventListener("click", zoomToPlan);
 el("adjustToggle").addEventListener("click", () => setAdjusting(!adjusting));
 
-el("startDraw").addEventListener("click", () => {
+const beginDrawing = () => {
   if (adjusting) setAdjusting(false);
   draft = [];
   redrawDraft();
@@ -1549,7 +1872,10 @@ el("startDraw").addEventListener("click", () => {
       : isLinkType(t) ? "Click one node, then the node to link it to."
         : isPointType(t) ? "Click where the door or entrance is."
           : "Click each corner, then Finish. Double-click also closes it.");
-});
+};
+
+el("startDraw").addEventListener("click", beginDrawing);
+el("startNetDraw").addEventListener("click", beginDrawing);
 
 el("modePlan").addEventListener("click", () => setMode("plan"));
 el("modeNetwork").addEventListener("click", () => setMode("network"));
@@ -1561,7 +1887,7 @@ function networkButtonLabel() {
 }
 
 el("netType").addEventListener("change", () => {
-  el("startDraw").textContent = networkButtonLabel();
+  el("startNetDraw").textContent = networkButtonLabel();
   if (draft) cancelDraft();
 });
 
@@ -1607,10 +1933,10 @@ el("tidyLinks").addEventListener("click", () => {
 
 el("saveFloor").addEventListener("click", saveFloor);
 
-el("rebuild").addEventListener("click", async () => {
+/** Rebuild the search index and the routing graph from what is on disk. */
+async function rebuildDerived() {
   const btn = el("rebuild");
   const state = el("rebuildState");
-  if (dirty) await saveFloor();
   btn.disabled = true;
   state.textContent = "rebuilding…";
   try {
@@ -1621,6 +1947,11 @@ el("rebuild").addEventListener("click", async () => {
   } finally {
     btn.disabled = false;
   }
+}
+
+el("rebuild").addEventListener("click", async () => {
+  if (dirty) return saveFloor();   // which rebuilds anyway
+  rebuildDerived();
 });
 
 // Capture phase: Mapbox's canvas handles keys of its own and swallows Enter
@@ -1631,6 +1962,29 @@ window.addEventListener("keydown", (e) => {
     return;
   }
   if (!draft) {
+    // Arrow keys nudge the selected marker, for the last pixel or two that
+    // dragging cannot manage. Shift moves it further.
+    const NUDGE = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+    if (NUDGE[e.key] && selected >= 0 && rooms[selected]?.kind === "point") {
+      const t = e.target;
+      if (t && typeof t.matches === "function" && t.matches("input, select, textarea")) return;
+      e.preventDefault();
+      const [dx, dy] = NUDGE[e.key];
+      const step = e.shiftKey ? 10 : 1;   // pixels on screen, at this zoom
+      const item = rooms[selected];
+      const p = map.project(itemLngLat(item));
+      const moved = map.unproject([p.x + dx * step, p.y + dy * step]);
+      if (item.ll) item.ll = [moved.lng, moved.lat];
+      else item.uv = lngLatToUv([moved.lng, moved.lat]);
+      if (item.type === "node") {
+        item.room = roomAtUv(itemUv(item));
+        item.building = buildingAt(itemLngLat(item));
+      }
+      redrawRooms();
+      markDirty();
+      return;
+    }
+
     // nothing being drawn: Delete removes whatever is selected
     if ((e.key === "Delete" || e.key === "Backspace") && selected >= 0) {
       const t = e.target;

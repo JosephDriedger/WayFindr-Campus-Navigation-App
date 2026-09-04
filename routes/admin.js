@@ -104,6 +104,75 @@ router.get("/api/floor/:building/:floor", guard, (req, res) => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// The walking network
+//
+// One file for the whole campus, kept apart from the floor sheets. A path
+// across the lawn belongs to no floor, and a node at the door of SW7 belongs
+// to SW7 -- neither is a fact about whichever sheet was open when it was
+// drawn, which is what storing the network inside a sheet made them.
+// ---------------------------------------------------------------------------
+const NETWORK_FILE = path.join(DATA, "walking-network.geojson");
+
+router.get("/api/network", guard, (req, res) => {
+  res.json({
+    featureCollection: readJson(NETWORK_FILE, {
+      type: "FeatureCollection", features: [],
+    }),
+  });
+});
+
+router.put("/api/network", guard, (req, res) => {
+  const fc = req.body?.featureCollection;
+  if (!fc || fc.type !== "FeatureCollection" || !Array.isArray(fc.features)) {
+    return res.status(400).json({ error: "Expected a GeoJSON FeatureCollection" });
+  }
+
+  const ids = new Set();
+  for (const f of fc.features) {
+    const g = f?.geometry;
+    const props = f?.properties || {};
+    if (props.type === "node") {
+      if (g?.type !== "Point" || !Array.isArray(g.coordinates) || g.coordinates.length !== 2) {
+        return res.status(400).json({ error: "A node needs a position" });
+      }
+      if (!props.nid || typeof props.nid !== "string") {
+        return res.status(400).json({ error: "A node needs an id, or nothing can link to it" });
+      }
+      if (ids.has(props.nid)) {
+        return res.status(400).json({ error: `Two nodes share the id ${props.nid}` });
+      }
+      ids.add(props.nid);
+    } else if (props.type === "path") {
+      const n = props.nodes;
+      if (!Array.isArray(n) || n.length !== 2 || n.some((v) => typeof v !== "string")) {
+        return res.status(400).json({ error: "A link must name the two nodes it joins" });
+      }
+    } else {
+      return res.status(400).json({ error: "The network holds nodes and links only" });
+    }
+  }
+
+  // A link to a node that is not here would be a hole in the network, and the
+  // graph builder would drop it silently at the next rebuild.
+  for (const f of fc.features) {
+    if (f.properties?.type !== "path") continue;
+    for (const nid of f.properties.nodes) {
+      if (!ids.has(nid)) {
+        return res.status(400).json({ error: `A link names ${nid}, which is not a node here` });
+      }
+    }
+  }
+
+  try {
+    fs.writeFileSync(NETWORK_FILE, JSON.stringify(fc, null, 1));
+  } catch (err) {
+    return res.status(500).json({ error: `Could not save the network: ${err.message}` });
+  }
+  const nodes = fc.features.filter((f) => f.properties?.type === "node").length;
+  res.json({ saved: true, nodes, links: fc.features.length - nodes });
+});
+
 /**
  * Replace one floor's rooms.
  *

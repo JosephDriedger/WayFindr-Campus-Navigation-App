@@ -263,6 +263,28 @@
       "confidence": null,
       "source": "SW3-Floor1.geojson",
       "query": "SW3-1690 Life Sciences Lab"
+    },
+    {
+      "label": "SW5-1840",
+      "building": "SW5",
+      "floor": "1",
+      "room": "1840",
+      "name": "Lecture Hall",
+      "type": "room",
+      "confidence": null,
+      "source": "SW5-Floor1.geojson",
+      "query": "SW5-1840 Lecture Hall"
+    },
+    {
+      "label": "SW5-1850",
+      "building": "SW5",
+      "floor": "1",
+      "room": "1850",
+      "name": "Lecture Hall",
+      "type": "room",
+      "confidence": null,
+      "source": "SW5-Floor1.geojson",
+      "query": "SW5-1850 Lecture Hall"
     }
   ]
 }

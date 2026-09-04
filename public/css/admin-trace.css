@@ -416,3 +416,29 @@ body.tracer-body {
   color: #b91c1c;
   background: #fef2f2;
 }
+
+/* The plan image controls: needed while lining a drawing up, in the way the
+   rest of the time. Folded away rather than removed. */
+.tracer-details {
+  margin-top: 10px;
+  border-top: 1px solid #e2e8f0;
+  padding-top: 8px;
+}
+
+.tracer-details > summary {
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #475569;
+  padding: 4px 0;
+}
+
+.tracer-details > summary:hover {
+  color: #1d4ed8;
+}
+
+.tracer-details[open] > summary {
+  margin-bottom: 6px;
+}

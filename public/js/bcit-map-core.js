@@ -139,6 +139,12 @@ window.addEventListener("DOMContentLoaded", () => {
     return buildingsWithPlans;
   };
 
+  // Which codes are real buildings, so "SW3" is read as one and "1750" is
+  // not. Filled in once the campus outlines load; empty until then, which
+  // only means a bare code typed in the first second is read as a room.
+  const buildingCodes = new Set();
+  const buildingNames = new Map();   // code -> "Tall Timber Student Housing"
+
   const RECENTS_KEY = 'wayfindr.recentRooms';
   const RECENTS_MAX = 8;
   const recentKey = (r) => `${r.building}|${r.floor || ''}|${r.room}`;
@@ -149,7 +155,19 @@ window.addEventListener("DOMContentLoaded", () => {
   const readRecents = () => {
     try {
       const v = JSON.parse(localStorage.getItem(RECENTS_KEY));
-      return Array.isArray(v) ? v : [];
+      if (!Array.isArray(v)) return [];
+      // A room number never contains its own building code. Entries that do
+      // were written by a bug, and there is no point making someone clear
+      // their history by hand to be rid of them.
+      return v.filter((r) => {
+        if (!r || !r.building || !r.room) return false;
+        const room = String(r.room).toUpperCase();
+        const building = String(r.building).toUpperCase();
+        if (room.startsWith(`${building}-`) || room === building) return false;
+        // a room whose "number" is another building's code -- "SW3-SW7" --
+        // came from a destination reference being stored whole
+        return !buildingCodes.has(room);
+      });
     } catch {
       return [];
     }
@@ -228,7 +246,7 @@ window.addEventListener("DOMContentLoaded", () => {
     const choose = (i) => {
       const m = matches[i];
       if (!m) return;
-      input.value = `${m.building}-${m.room}`;
+      input.value = m.isBuilding ? m.building : `${m.building}-${m.room}`;
       close();
       input.focus();
     };
@@ -237,7 +255,7 @@ window.addEventListener("DOMContentLoaded", () => {
       if (!matches.length) return close();
       box.innerHTML = matches.map((m, i) => `
         <button type="button" class="browse-suggest-row${i === active ? " is-active" : ""}" data-i="${i}">
-          <span>${esc(m.building)}-${esc(m.room)}${m.name ? ` <em>${esc(m.name)}</em>` : ""}</span>
+          <span>${esc(m.building)}${m.isBuilding ? "" : `-${esc(m.room)}`}${m.name ? ` <em>${esc(m.name)}</em>` : ""}</span>
           <small>${esc(m.floorLabel)}${m.type && m.type !== "room" ? ` · ${esc(m.type)}` : ""}</small>
         </button>`).join("");
       box.hidden = false;
@@ -256,6 +274,22 @@ window.addEventListener("DOMContentLoaded", () => {
       if (q.length < 1) return close();
       const rooms = await roomIndexPromise;
       const scored = [];
+
+      // Buildings are destinations in their own right -- "take me to SW7"
+      // when you do not know or care which room. They rank above rooms on an
+      // exact code match, because typing "SW3" means the building.
+      for (const code of buildingCodes) {
+        const label = String(code).toUpperCase();
+        let rank = null;
+        if (label === q) rank = -1;
+        else if (label.startsWith(q)) rank = 1.5;
+        if (rank === null) continue;
+        scored.push({
+          rank, building: code, room: '', isBuilding: true,
+          name: buildingNames.get(label) || null,
+          floorLabel: 'Building',
+        });
+      }
       for (const r of rooms) {
         if (!r.building || !r.room) continue;
         // A corridor is something you walk along, not somewhere you are
@@ -366,7 +400,14 @@ window.addEventListener("DOMContentLoaded", () => {
     const s = (raw || '').trim().toUpperCase();
     if (!s) return null;
     const m = s.match(/^([A-Z]+\d*)[-\s]+(\S.*)$/);
-    return m ? { building: m[1], room: m[2].trim() } : { building: null, room: s };
+    if (m) return { building: m[1], room: m[2].trim() };
+    // A building code on its own is a destination too -- "take me to SW3"
+    // when you do not know which room you want. It has no room, and the
+    // router reads that as "anywhere in this building".
+    if (/^[A-Z]{1,4}\d{0,3}$/.test(s) && buildingCodes.has(s)) {
+      return { building: s, room: '' };
+    }
+    return { building: null, room: s };
   };
 
   // Drawn straight away rather than from the map's load handler: the panel
@@ -389,7 +430,7 @@ window.addEventListener("DOMContentLoaded", () => {
     const from = parseRoomRef(form.from.value);
     const to = parseRoomRef(form.to.value);
     if (!to) {
-      showError('Enter a room to go to.');
+      showError('Enter a room or a building to go to.');
       return false;
     }
     if (!from) {
@@ -400,14 +441,16 @@ window.addEventListener("DOMContentLoaded", () => {
     }
     const building = from.building || to.building;
     if (!building) {
-      showError('Include the building code on at least one room, e.g. SW3-1600.');
+      showError('Include the building code, e.g. SW3-1600 or just SW3.');
       return false;
     }
-    if (from.building && to.building && from.building !== to.building) {
-      showError('Indoor routes are within a single building for now.');
-      return false;
-    }
-    routeBetweenRooms(building, from.room, to.room);
+    // Pass each end fully qualified -- "SW3-1990", or just "SW7" for a
+    // building -- so the router can tell a room in this building from a
+    // different building altogether.
+    const refText = (r) => (r.room ? (r.building ? `${r.building}-${r.room}` : r.room) : r.building);
+    const refLabel = (r) => (r.room ? makeRoomLabel(r.building || building, '', r.room) : r.building);
+    routeBetweenRooms(building, refText(from), refText(to),
+      { fromLabel: refLabel(from), toLabel: refLabel(to) });
     return false;
   };
 
@@ -455,6 +498,29 @@ window.addEventListener("DOMContentLoaded", () => {
     if (form) form.from.value = `${building}-${near.room}`;
     routeBetweenRooms(building, near.room, to.room,
       { fromLabel: `${label} · ${near.room}` });
+  };
+
+  // "Directions" on a building card: route to the building itself, from
+  // wherever the user is. Which room they end up nearest is the router's
+  // business -- the point is getting to the building.
+  const routeToBuilding = async (code) => {
+    const b = String(code || '').trim().toUpperCase();
+    if (!b) return;
+    // There is no outdoor network yet, so a route to a building can only be
+    // worked out from somewhere already on the network. Rather than guess at
+    // a start and produce a route from nowhere, this opens the directions
+    // form with the destination filled in and the cursor in the start box.
+    clearNavigation();
+    await renderBrowse();
+    const form = document.querySelector('.browse-directions');
+    if (!form) return;
+    form.to.value = b;
+    form.from.focus();
+    const errEl = document.getElementById('browse-directions-error');
+    if (errEl) {
+      errEl.textContent = `Going to ${b}. Where are you starting from?`;
+      errEl.hidden = false;
+    }
   };
 
   const getJSON = async (url) => {
@@ -641,12 +707,17 @@ window.addEventListener("DOMContentLoaded", () => {
         const gap = i > 0 ? metresBetween(path[i - 1], p) : 0;
         const space = p.room || null;
         const last = legs[legs.length - 1];
-        if (last && last.space === space && last.floor === p.floor) {
+        // A leg is a space, on a floor, in a building. Crossing from one
+        // building to another starts a new leg even when neither end has a
+        // room number -- walking out of SW3 and into SW7 is two things.
+        if (last && last.space === space && last.floor === p.floor
+          && last.building === (p.building || null)) {
           last.metres += gap;
           last.end = p;
         } else {
           legs.push({
             space, name: p.name || null, floor: p.floor, metres: gap,
+            building: p.building || null,
             // p.type is what the node is; p.space is what it stands in, and a
             // walking node in a stairwell is typed as a corridor either way
             type: p.space || p.type, kind: p.kind, end: p,
@@ -681,19 +752,28 @@ window.addEventListener("DOMContentLoaded", () => {
 
       // "1750 (Lecture Hall)" is how a person holds the place in their head:
       // the number gets you to the door, the name tells you you are there.
-      const named = (leg) => {
+      const named = (leg, arriving) => {
         if (leg.space && leg.name) return `${leg.space} (${leg.name})`;
         if (leg.space) return leg.space;
         if (leg.name) return leg.name;
-        return leg.type === 'stairs' ? 'the stairs'
-          : leg.type === 'elevator' ? 'the lift' : 'the hallway';
+        if (leg.type === 'stairs') return 'the stairs';
+        if (leg.type === 'elevator') return 'the lift';
+        // Outside there are no room numbers at all.
+        if (!leg.building) return 'the path outside';
+        // Inside one, an unnamed stretch is a hallway. The building's own
+        // name is the answer only when the building is where you are going --
+        // "follow SW3 for 6 m" is not something anyone would say.
+        return arriving ? leg.building : 'the hallway';
       };
 
       let lastFloor = null;
       legs.forEach((leg, i) => {
-        if (leg.floor !== lastFloor) {
-          push(`Floor ${leg.floor}`, 'floor-heading');
-          lastFloor = leg.floor;
+        // A node outdoors is on no floor, and "Floor null" is not a heading.
+        const where = leg.floor ? `Floor ${leg.floor}`
+          : leg.building ? leg.building : 'Outside';
+        if (where !== lastFloor) {
+          push(where, 'floor-heading');
+          lastFloor = where;
         }
         const isLast = i === legs.length - 1;
         if (i === 0) {
@@ -706,7 +786,7 @@ window.addEventListener("DOMContentLoaded", () => {
           return;
         }
         if (isLast) {
-          push(`Arrive at ${named(leg)}`);
+          push(`Arrive at ${named(leg, true)}`);
           return;
         }
         if (isVertical(leg)) {
@@ -835,10 +915,14 @@ window.addEventListener("DOMContentLoaded", () => {
     // A start the user did not type is theirs, not a room number they have to
     // recognise, so the caller can say what to call it.
     const fromLabel = opts.fromLabel || makeRoomLabel(b, '', from);
-    const toLabel = makeRoomLabel(b, '', to);
+    const toLabel = opts.toLabel || makeRoomLabel(b, '', to);
     renderDirectionsCard({ fromLabel, toLabel });
     await requestAndOverlayIndoorPath(b, from, b, to, fromLabel, toLabel, { fit: true });
-    rememberRoom({ building: b, room: to });
+    // `to` may be fully qualified ("SW3-1750") or a building on its own
+    // ("SW7"), so it is split before being remembered -- otherwise recents
+    // filled up with "SW3-SW3-1750" and "SW3-SW7".
+    const toRef = parseRoomRef(to);
+    if (toRef?.room) rememberRoom({ building: toRef.building || b, room: toRef.room });
   };
 
   async function requestAndOverlayIndoorPath(startBuildingCode, startRoomOrEntrance, goalBuildingCode, goalRoom, fromLabel, toLabel, { fit = false } = {}) {
@@ -1069,6 +1153,7 @@ window.addEventListener("DOMContentLoaded", () => {
     setStartFromRoom,
     toggleFavoriteRoom,
     routeBetweenRooms,
+    routeToBuilding,
     submitDirections,
     rememberRoom,
     clearRecents,
@@ -1101,6 +1186,14 @@ window.addEventListener("DOMContentLoaded", () => {
     try {
       const [buildings, buildingsIndex] = await Promise.all([getJSON('/data/bcit-coordinates.geojson'), getJSON('/data/bcit-buildings-index.json')]);
       window.__BUILDINGS_INDEX__ = buildingsIndex || {};
+      Object.keys(window.__BUILDINGS_INDEX__).forEach((c) => buildingCodes.add(c.toUpperCase()));
+      for (const f of buildings.features || []) {
+        const p = f.properties || {};
+        const code = String(p.BuildingName || "").toUpperCase();
+        if (!code) continue;
+        buildingCodes.add(code);
+        if (p.Display_Name) buildingNames.set(code, p.Display_Name);
+      }
 
       map.addSource('buildings', { type: 'geojson', data: buildings });
       map.addLayer({ id: 'buildings-fill', type: 'fill', source: 'buildings', paint: { 'fill-color': '#93c5fd', 'fill-opacity': 0.35 } });

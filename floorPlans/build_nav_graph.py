@@ -51,6 +51,10 @@ FLOOR_CHANGE_M = 15.0
 DESTINATION_TYPE = "room"
 VERTICAL_SPACES = {"stairs", "elevator"}
 
+# What to call the part of the network that is not in any building. It is not
+# a building, so it is not counted as one -- but it is worth seeing.
+OUTDOORS = "(outdoors)"
+
 
 def metres(a, b):
     """Great-circle distance between two [lng, lat] points."""
@@ -90,13 +94,55 @@ def read_sheet(path):
         return {}
 
 
-def collect(src):
+def read_network(path):
+    """The campus walking network: every node and every link, in one place.
+
+    Kept apart from the floor sheets because it is not part of any one of
+    them. A path across the campus belongs to no floor, and a node at the door
+    of SW7 belongs to SW7 -- neither is a fact about the sheet somebody
+    happened to be tracing at the time.
+    """
+    if not os.path.exists(path):
+        return [], []
+    data = read_sheet(path)
+    nodes, links = [], []
+    for f in data.get("features") or []:
+        props = f.get("properties") or {}
+        geom = f.get("geometry") or {}
+        if props.get("type") == NODE_TYPE and geom.get("type") == "Point":
+            nodes.append((props, geom["coordinates"]))
+        elif props.get("type") == PATH_TYPE:
+            pair = props.get("nodes") or []
+            if len(pair) == 2:
+                links.append((pair[0], pair[1], props.get("metres")))
+    return nodes, links
+
+
+def collect(src, network_path):
     """The nodes, the links between them, and what each room is called."""
     nodes = []           # in file order; index is the graph id
     by_nid = {}
     links = []           # (nid_a, nid_b, metres or None)
-    labels = {}          # (building, room) -> {"name": ..., "space": ...}
+    labels = {}          # (building, floor, room) -> {"name": ..., "space": ...}
     rooms_seen = defaultdict(set)   # building -> room numbers worth reaching
+
+    # The network first, since that is where it lives now.
+    net_nodes, net_links = read_network(network_path)
+    for props, (lng, lat) in net_nodes:
+        nid = props.get("nid")
+        if not nid or nid in by_nid:
+            continue
+        by_nid[nid] = len(nodes)
+        nodes.append({
+            "nid": nid,
+            # a node says which building it is in; no building means outdoors
+            "building": props.get("building") or None,
+            "floor": props.get("floor") or None,
+            "room": str(props["room"]) if props.get("room") else None,
+            "lng": round(float(lng), 7),
+            "lat": round(float(lat), 7),
+        })
+    links.extend(net_links)
 
     for building, floor, path in floor_files(src):
         data = read_sheet(path)
@@ -110,22 +156,22 @@ def collect(src):
             kind = props.get("type") or "room"
             if not room or f.get("geometry", {}).get("type") != "Polygon":
                 continue
-            entry = labels.setdefault((building, str(room)), {})
+            entry = labels.setdefault((building, floor, str(room)), {})
             if props.get("name"):
                 entry.setdefault("name", str(props["name"]).strip())
             entry.setdefault("space", kind)
             if kind == DESTINATION_TYPE:
                 rooms_seen[building].add(str(room))
 
+        # A sheet traced before the network was separated still carries its
+        # own nodes; they are read so nothing is lost, and take the sheet's
+        # building and floor as they always did.
         for f in feats:
             props = f.get("properties") or {}
             geom = f.get("geometry") or {}
             if geom.get("type") == "Point" and props.get("type") == NODE_TYPE:
                 nid = props.get("nid")
-                if not nid:
-                    continue  # a node with no id cannot be linked to anything
-                if nid in by_nid:
-                    print(f"  ! duplicate node id {nid} in {os.path.basename(path)}")
+                if not nid or nid in by_nid:
                     continue
                 lng, lat = geom["coordinates"]
                 by_nid[nid] = len(nodes)
@@ -205,14 +251,19 @@ def components(count, adjacency):
     return groups
 
 
-def build(src):
-    nodes, links, labels, rooms_seen, by_nid = collect(src)
+def build(src, network_path):
+    nodes, links, labels, rooms_seen, by_nid = collect(src, network_path)
 
     # Labels come from the sheet the node sits on, keyed by the room it says
     # it serves -- so a node in the lecture hall knows it is in a lecture hall
     # without the graph ever holding the room itself.
     for n in nodes:
-        label = labels.get((n["building"], n["room"] or ""), {})
+        # the label for the space this node stands in, on its own floor --
+        # falling back to any floor of that building, which is what an
+        # outdoor node standing at a door needs
+        label = labels.get((n["building"], n["floor"], n["room"] or "")) or next(
+            (v for (b, _f, r), v in labels.items()
+             if b == n["building"] and r == (n["room"] or "")), {})
         if label.get("name"):
             n["name"] = label["name"]
         if label.get("space"):
@@ -282,8 +333,10 @@ def build(src):
         "nodes": out_nodes,
         "edges": [[i, j, round(w, 2)] for (i, j), w in sorted(edges.items())],
         "buildings": {
-            b: {"nodes": v["nodes"], "floors": sorted(v["floors"])}
-            for b, v in sorted(buildings.items())
+            (b or OUTDOORS): {"nodes": v["nodes"], "floors": sorted(v["floors"])}
+            # outdoors last, and only named buildings are sorted among
+            # themselves -- None does not compare with a string
+            for b, v in sorted(buildings.items(), key=lambda kv: (kv[0] is None, kv[0] or ""))
         },
         "unreachableRooms": unreachable,
         "components": len(groups),
@@ -294,15 +347,20 @@ def build(src):
 def main():
     src = sys.argv[1] if len(sys.argv) > 1 else "public/data/floor-coordinates"
     out = sys.argv[2] if len(sys.argv) > 2 else "public/data/nav-graph.json"
+    network = sys.argv[3] if len(sys.argv) > 3 else "public/data/walking-network.geojson"
 
-    graph, stats = build(src)
+    graph, stats = build(src, network)
 
     with open(out, "w", encoding="utf-8") as fh:
         json.dump(graph, fh, separators=(",", ":"))
 
+    named = [b for b in graph["buildings"] if b != OUTDOORS]
     print(f"{len(graph['nodes'])} nodes, {len(graph['edges'])} links "
-          f"across {len(graph['buildings'])} building(s) -> {out}")
+          f"across {len(named)} building(s) -> {out}")
     for b, v in graph["buildings"].items():
+        if b == OUTDOORS:
+            print(f"  {OUTDOORS}: {v['nodes']} nodes on paths between buildings")
+            continue
         floors = ", ".join(v["floors"]) or "no floor"
         print(f"  {b}: {v['nodes']} nodes on floor {floors}")
 

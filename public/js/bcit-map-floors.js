@@ -214,6 +214,12 @@
                   onclick="window.BCITMap && window.BCITMap.leaveBuilding && window.BCITMap.leaveBuilding();">&larr; All Buildings</button>
           <h2>${title}</h2>
           <div class="place-sub">Building</div>
+          <div class="place-actions">
+            <button type="button" class="btn-primary"
+              onclick="window.BCITMap && window.BCITMap.routeToBuilding && window.BCITMap.routeToBuilding('${currentBuildingCode}');">
+              Directions
+            </button>
+          </div>
           <div class="floor-pills">${buttonsHtml}</div>
           <div class="room-list-header">
             Rooms on Floor ${currentFloorLabel}${roomsHere.length ? ` (${roomsHere.length})` : ""}
@@ -250,6 +256,31 @@
         });
       }
     };
+
+    /**
+     * A colour per kind of space.
+     *
+     * Warm means somewhere you can be sent; everything else is cooler and
+     * sits back. Beyond that the point is telling them apart at a glance: a
+     * stairwell should not have to be read to be recognised. Kept in one
+     * table so the fill, the outline and anything added later cannot drift
+     * apart.
+     */
+    const SPACE_COLOURS = {
+      room:     { fill: "#fb923c", line: "#b91c1c", opacity: 0.65 },
+      hallway:  { fill: "#cbd5e1", line: "#94a3b8", opacity: 0.5 },
+      service:  { fill: "#a8a29e", line: "#78716c", opacity: 0.45 },
+      stairs:   { fill: "#6ee7b7", line: "#059669", opacity: 0.7 },
+      elevator: { fill: "#c4b5fd", line: "#7c3aed", opacity: 0.7 },
+    };
+    const DEFAULT_SPACE = SPACE_COLOURS.room;
+
+    /** A Mapbox match expression over the table above. */
+    const byType = (field) => [
+      "match", ["get", "type"],
+      ...Object.entries(SPACE_COLOURS).flatMap(([type, c]) => [type, c[field]]),
+      DEFAULT_SPACE[field],
+    ];
 
     // ---------------- Stairs and lift icons ----------------
     //
@@ -321,16 +352,8 @@
         type: "fill",
         source: FLOOR_SRC,
         paint: {
-          "fill-color": [
-            "match", ["get", "type"],
-            "hallway", "#cbd5e1",
-            "#fb923c",
-          ],
-          "fill-opacity": [
-            "match", ["get", "type"],
-            "hallway", 0.5,
-            0.65,
-          ],
+          "fill-color": byType("fill"),
+          "fill-opacity": byType("opacity"),
         },
       });
 
@@ -339,14 +362,11 @@
         type: "line",
         source: FLOOR_SRC,
         paint: {
-          "line-color": [
-            "match", ["get", "type"],
-            "hallway", "#94a3b8",
-            "#b91c1c",
-          ],
+          "line-color": byType("line"),
           "line-width": [
             "match", ["get", "type"],
             "hallway", 1,
+            "service", 1,
             1.4,
           ],
         },
@@ -513,7 +533,14 @@
         // every room. It is rendered only when a route is being shown.
         if (src) src.setData(withoutNetwork(data));
       } catch (err) {
-        console.error("[BCIT MAP] Failed to load floor coordinates:", url, err);
+        // A building nobody has traced yet has no sheet, and that is an
+        // ordinary state of affairs rather than a fault -- most of the campus
+        // is in it. Clear whatever floor was showing and say nothing.
+        const src = map.getSource(FLOOR_SRC);
+        if (src) src.setData({ type: "FeatureCollection", features: [] });
+        if (!/404/.test(String(err && err.message))) {
+          console.error("[BCIT MAP] Failed to load floor coordinates:", url, err);
+        }
       }
     };
 

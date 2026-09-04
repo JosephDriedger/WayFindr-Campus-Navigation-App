@@ -126,8 +126,16 @@ function loadGraph() {
     }
   });
 
+  // every node of a building, for when the building itself is the destination
+  const byBuilding = new Map();
+  nodes.forEach((n) => {
+    if (!n.building) return;
+    if (!byBuilding.has(n.building)) byBuilding.set(n.building, []);
+    byBuilding.get(n.building).push(n.id);
+  });
+
   const buildings = new Set(nodes.map((n) => n.building).filter(Boolean));
-  const graph = { nodes, adj, byRoom, buildings, key };
+  const graph = { nodes, adj, byRoom, byBuilding, buildings, key };
   cached = { mtimeMs: stat.mtimeMs, graph };
   return graph;
 }
@@ -137,10 +145,21 @@ export function invalidateCache() {
   cached = null;
 }
 
-/** The nodes that serve a room, or an empty list if none do. */
+/**
+ * The nodes that answer to a destination, or an empty list if none do.
+ *
+ * A destination is usually a room, but it can be a whole building: "take me
+ * to SW3" is a reasonable thing to ask when you do not know or care which
+ * room you are heading for. Every node in the building is then a candidate,
+ * and since the search runs to whichever is nearest, that lands you at the
+ * closest way in rather than at some arbitrary point inside.
+ */
 function nodesFor(graph, building, room) {
   const wanted = String(room ?? "").trim();
-  if (!wanted) return [];
+  // no room at all, or the building's own name: the building is the target
+  if (!wanted || wanted.toUpperCase() === building) {
+    return graph.byBuilding.get(building) || [];
+  }
   // "SW3-1615" typed into a box that already knows the building
   const bare = wanted.replace(new RegExp(`^${building}[-\\s]*`, "i"), "");
   return graph.byRoom.get(graph.key(building, bare))
@@ -242,14 +261,21 @@ export function findIndoorPath(building, startRoom, goalRoom) {
     };
   }
 
-  const from = parseRef(startRoom, code);
-  const to = parseRef(goalRoom, code);
+  // A bare code that names a building is that building, not a room inside the
+  // one being looked at: "SW3-1990 to SW7" crosses the campus, it does not
+  // look for a room called SW7 in SW3.
+  const asBuilding = (ref) => {
+    const text = String(ref ?? "").trim().toUpperCase();
+    return graph.buildings.has(text) ? { building: text, room: "" } : null;
+  };
+  const from = asBuilding(startRoom) || parseRef(startRoom, code);
+  const to = asBuilding(goalRoom) || parseRef(goalRoom, code);
   const starts = nodesFor(graph, from.building, from.room);
   const goals = nodesFor(graph, to.building, to.room);
 
   const missing = [
-    !starts.length && startRoom,
-    !goals.length && goalRoom,
+    !starts.length && (startRoom || from.building),
+    !goals.length && (goalRoom || to.building),
   ].filter(Boolean);
   if (missing.length) {
     // Naming what is missing matters: a room with no node is a room nobody
@@ -278,6 +304,15 @@ export function findIndoorPath(building, startRoom, goalRoom) {
 
   const shared = starts.filter((s) => goals.includes(s));
   if (shared.length) {
+    // Asking for a building you are already standing in is not a route. A
+    // 0 m answer is true and useless; saying so and asking for a room is
+    // what the person actually needs.
+    if (!to.room || to.room.toUpperCase() === to.building) {
+      return {
+        success: false,
+        message: `You are already in ${to.building}. Pick a room to route to.`,
+      };
+    }
     return { success: true, path: [toPoint(graph.nodes[shared[0]])], distanceM: 0 };
   }
 

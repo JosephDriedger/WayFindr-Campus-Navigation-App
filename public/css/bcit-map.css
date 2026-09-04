@@ -1,3 +1,12 @@
+/* The hidden attribute only carries display:none from the browser's default
+   stylesheet, so any rule that sets display -- every flex row here -- beats
+   it. That is how the empty "you have a class now" banner came to sit under
+   the search box as a blue bar with nothing in it. Said once, explicitly, so
+   it cannot happen again to anything else. */
+[hidden] {
+  display: none !important;
+}
+
 /* Make sure the page can give height to the map */
 html,
 body {

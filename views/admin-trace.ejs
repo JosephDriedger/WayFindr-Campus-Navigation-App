@@ -22,88 +22,25 @@
         <p class="tracer-hint" id="planStatus">Pick a floor to start.</p>
       </section>
 
-      <section class="tracer-block" id="placeBlock" hidden>
-        <h3>The Plan</h3>
-        <p class="tracer-hint">
-          Trace the whole floor first — everything you draw sticks to the
-          drawing. Then use <em>Move / Rotate Plan</em> to line the finished
-          floor up with the building, and it all moves together.
-        </p>
-        <p class="tracer-hint" id="adjustHint" hidden>
-          Drag the blue handle to move, the orange corner to resize, and the
-          green stalk to rotate. Each does one thing only.
-        </p>
-        <label class="tracer-field">
-          <span>Plan Transparency <output id="opacityOut">65%</output></span>
-          <input type="range" id="opacity" min="0" max="100" value="65"
-                 aria-label="Plan transparency">
-        </label>
-        <div class="tracer-row">
-          <button type="button" id="togglePlan">Hide Plan</button>
-          <span class="tracer-saved">or hold H to peek</span>
-        </div>
-        <div class="tracer-row">
-          <button type="button" id="fitBuilding">Fit to Building</button>
-          <button type="button" id="zoomPlan">Zoom to Plan</button>
-        </div>
+      <!-- Two jobs, and the panel only ever shows one of them. Drawing what
+           a floor IS and drawing how you WALK the campus are different tasks
+           with different tools, and mixing them is what made this confusing:
+           plan-positioning controls sat above the network tools even though
+           the network is not part of any plan. -->
+      <div class="tracer-modes" id="modeSwitch" role="tablist" hidden>
+        <button type="button" id="modePlan" class="is-active" role="tab">Floor Plan</button>
+        <button type="button" id="modeNetwork" role="tab">Walking Network</button>
+      </div>
 
-        <div class="tracer-adjust">
-          <div class="tracer-adjust-row">
-            <span class="tracer-adjust-label">Position</span>
-            <div class="tracer-pad">
-              <button type="button" id="nudgeUp" title="Move north">↑</button>
-              <button type="button" id="nudgeLeft" title="Move west">←</button>
-              <button type="button" id="nudgeRight" title="Move east">→</button>
-              <button type="button" id="nudgeDown" title="Move south">↓</button>
-            </div>
-            <label class="tracer-step">
-              Step
-              <select id="nudgeStep">
-                <option value="0.1">0.1 m</option>
-                <option value="0.5">0.5 m</option>
-                <option value="1" selected>1 m</option>
-                <option value="5">5 m</option>
-                <option value="20">20 m</option>
-              </select>
-            </label>
-          </div>
-
-          <div class="tracer-adjust-row">
-            <span class="tracer-adjust-label">Width</span>
-            <button type="button" id="scaleDown" title="Smaller">−</button>
-            <input type="number" id="planWidth" step="0.1" min="1" aria-label="Plan width in metres">
-            <span class="tracer-unit">m</span>
-            <button type="button" id="scaleUp" title="Bigger">+</button>
-          </div>
-
-          <div class="tracer-adjust-row">
-            <span class="tracer-adjust-label">Rotation</span>
-            <button type="button" id="rotLeft" title="Rotate anticlockwise 1°">⟲</button>
-            <input type="number" id="planRotation" step="0.1" aria-label="Plan rotation in degrees">
-            <span class="tracer-unit">°</span>
-            <button type="button" id="rotRight" title="Rotate clockwise 1°">⟳</button>
-            <button type="button" id="rotQuarter" title="Turn a quarter">90°</button>
-          </div>
-        </div>
-      </section>
-
-      <section class="tracer-block" id="drawBlock" hidden>
-        <!-- Two jobs, kept apart: drawing what the floor IS, and drawing how
-             you WALK through it. Each has its own tools and its own list, and
-             whichever you are not working on fades into the background. -->
-        <div class="tracer-modes" role="tablist">
-          <button type="button" id="modePlan" class="is-active" role="tab">Floor Plan</button>
-          <button type="button" id="modeNetwork" role="tab">Walking Network</button>
-        </div>
-
-        <h3 id="tracedHeading">Traced <span class="tracer-count" id="roomCount">0</span></h3>
-
+      <!-- ------------------------------ Floor plan ------------------------ -->
+      <section class="tracer-block" id="planMode" hidden>
+        <h3>Draw <span class="tracer-count" id="roomCount">0</span></h3>
         <label class="tracer-field" id="planTypeField">
           <span>What Are You Drawing</span>
           <select id="drawType">
-<!-- What a space is called goes in its name -- "Women's Washroom", "AV
-                 Room". The type is only what the app does with it: send people
-                 to it, draw it, or connect floors through it. -->
+            <!-- What a space is called goes in its name -- "Women's
+                 Washroom", "AV Room". The type is only what the app does with
+                 it: send people to it, draw it, or connect floors. -->
             <optgroup label="Outlines">
               <option value="building">Building Outline</option>
               <option value="room" selected>Room</option>
@@ -118,23 +55,8 @@
             </optgroup>
           </select>
         </label>
-
-        <div class="tracer-row" id="netTools" hidden>
-          <button type="button" id="autoName">Auto-name Nodes</button>
-          <button type="button" id="tidyLinks">Remove Duplicate Links</button>
-        </div>
-        <p class="tracer-hint" id="netToolsResult" hidden></p>
-
-        <label class="tracer-field" id="netTypeField" hidden>
-          <span>What Are You Drawing</span>
-          <select id="netType">
-            <option value="node" selected>Place Nodes</option>
-            <option value="link">Link Two Nodes</option>
-          </select>
-        </label>
         <div class="tracer-row">
           <button type="button" id="startDraw" class="tracer-primary">Draw</button>
-          <button type="button" id="adjustToggle">Move / Rotate Plan</button>
         </div>
         <div class="tracer-row" id="draftControls" hidden>
           <button type="button" id="finishDraw" class="tracer-primary">Finish Room</button>
@@ -145,25 +67,123 @@
           Click each corner, then Finish. Double-click also closes it;
           Backspace undoes a corner and Esc cancels.
         </p>
-        <ul class="tracer-rooms" id="roomList"></ul>
-        <div class="tracer-row">
-          <button type="button" id="saveFloor" class="tracer-primary">Save Floor</button>
-          <span class="tracer-saved" id="saveState"></span>
-        </div>
+
+        <details class="tracer-details" id="planImageBlock">
+          <summary>Plan Image</summary>
+          <p class="tracer-hint">
+            Trace the floor first — outlines stick to the drawing. Then line
+            the finished floor up with the building and it all moves together.
+          </p>
+          <label class="tracer-field">
+            <span>Transparency <output id="opacityOut">65%</output></span>
+            <input type="range" id="opacity" min="0" max="100" value="65"
+                   aria-label="Plan transparency">
+          </label>
+          <div class="tracer-row">
+            <button type="button" id="togglePlan">Hide Plan</button>
+            <span class="tracer-saved">or hold H to peek</span>
+          </div>
+          <div class="tracer-row">
+            <button type="button" id="fitBuilding">Fit to Building</button>
+            <button type="button" id="zoomPlan">Zoom to Plan</button>
+          </div>
+          <div class="tracer-row">
+            <button type="button" id="adjustToggle">Move / Rotate Plan</button>
+          </div>
+          <p class="tracer-hint" id="adjustHint" hidden>
+            Drag the blue handle to move, the orange corner to resize, and the
+            green stalk to rotate. Each does one thing only.
+          </p>
+
+          <div class="tracer-adjust">
+            <div class="tracer-adjust-row">
+              <span class="tracer-adjust-label">Position</span>
+              <div class="tracer-pad">
+                <button type="button" id="nudgeUp" title="Move north">↑</button>
+                <button type="button" id="nudgeLeft" title="Move west">←</button>
+                <button type="button" id="nudgeRight" title="Move east">→</button>
+                <button type="button" id="nudgeDown" title="Move south">↓</button>
+              </div>
+              <label class="tracer-step">
+                Step
+                <select id="nudgeStep">
+                  <option value="0.1">0.1 m</option>
+                  <option value="0.5">0.5 m</option>
+                  <option value="1" selected>1 m</option>
+                  <option value="5">5 m</option>
+                  <option value="20">20 m</option>
+                </select>
+              </label>
+            </div>
+            <div class="tracer-adjust-row">
+              <span class="tracer-adjust-label">Width</span>
+              <button type="button" id="scaleDown" title="Narrower">−</button>
+              <input type="number" id="planWidth" step="0.1" min="1" aria-label="Plan width in metres">
+              <span class="tracer-unit">m</span>
+              <button type="button" id="scaleUp" title="Wider">+</button>
+            </div>
+            <div class="tracer-adjust-row">
+              <span class="tracer-adjust-label">Rotation</span>
+              <button type="button" id="rotLeft" title="Rotate anticlockwise">↺</button>
+              <input type="number" id="planRotation" step="0.5" aria-label="Plan rotation in degrees">
+              <span class="tracer-unit">°</span>
+              <button type="button" id="rotRight" title="Rotate clockwise">↻</button>
+              <button type="button" id="rotQuarter" title="Rotate a quarter turn">90°</button>
+            </div>
+          </div>
+        </details>
       </section>
 
-      <section class="tracer-block">
-        <h3>Publish</h3>
+      <!-- ---------------------------- Walking network --------------------- -->
+      <section class="tracer-block" id="networkMode" hidden>
+        <h3>Network <span class="tracer-count" id="netCount">0</span></h3>
         <p class="tracer-hint">
-          Saving writes the floor. Search and routing read files built from it,
-          so rebuild when you want what you have traced to be findable and
-          routable in the app.
+          One network for the whole campus. It is the same whichever floor you
+          have open, so you can run a path out of a door, across the grass and
+          into the next building.
+        </p>
+        <label class="tracer-field" id="netTypeField">
+          <span>What Are You Drawing</span>
+          <select id="netType">
+            <option value="node" selected>Place Nodes</option>
+            <option value="link">Link Two Nodes</option>
+          </select>
+        </label>
+        <div class="tracer-row">
+          <button type="button" id="startNetDraw" class="tracer-primary">Place Nodes</button>
+        </div>
+        <p class="tracer-hint" id="netHint">
+          Click where someone can stand. A node inside a building belongs to
+          it, which is what makes that building routable.
+        </p>
+        <div class="tracer-row" id="netTools">
+          <button type="button" id="autoName">Auto-name Nodes</button>
+          <button type="button" id="tidyLinks">Remove Duplicate Links</button>
+        </div>
+        <p class="tracer-hint" id="netToolsResult" hidden></p>
+      </section>
+
+      <!-- ------------------------------- The list ------------------------- -->
+      <section class="tracer-block" id="listBlock" hidden>
+        <ul class="tracer-rooms" id="roomList"></ul>
+      </section>
+
+      <!-- ------------------------------- Saving --------------------------- -->
+      <section class="tracer-block" id="saveBlock" hidden>
+        <div class="tracer-row">
+          <button type="button" id="saveFloor" class="tracer-primary">Save &amp; Publish</button>
+          <span class="tracer-saved" id="saveState"></span>
+        </div>
+        <p class="tracer-hint">
+          Saving writes what you traced and rebuilds search and routing, so the
+          app has it straight away.
         </p>
         <div class="tracer-row">
-          <button type="button" id="rebuild">Rebuild Search &amp; Routing</button>
+          <button type="button" id="rebuild">Rebuild Only</button>
           <span class="tracer-saved" id="rebuildState"></span>
         </div>
       </section>
+
     </aside>
 
     <div id="map" class="tracer-map"></div>
