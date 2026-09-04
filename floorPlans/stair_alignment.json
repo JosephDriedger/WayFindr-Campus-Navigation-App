@@ -1,0 +1,406 @@
+[
+  {
+    "building": "SE41",
+    "floors": 2,
+    "verticals_per_floor": [
+      4,
+      6
+    ],
+    "matched": 4,
+    "unmatched": 0,
+    "matched_median_m": 7.94,
+    "matched_worst_m": 7.97,
+    "center_drift_m": 8.7
+  },
+  {
+    "building": "SE1",
+    "floors": 2,
+    "verticals_per_floor": [
+      5,
+      4
+    ],
+    "matched": 3,
+    "unmatched": 2,
+    "matched_median_m": 6.9,
+    "matched_worst_m": 6.96,
+    "center_drift_m": 8.9
+  },
+  {
+    "building": "SE8",
+    "floors": 2,
+    "verticals_per_floor": [
+      7,
+      4
+    ],
+    "matched": 2,
+    "unmatched": 5,
+    "matched_median_m": 6.32,
+    "matched_worst_m": 6.32,
+    "center_drift_m": 11.5
+  },
+  {
+    "building": "NE25",
+    "floors": 3,
+    "verticals_per_floor": [
+      2,
+      4,
+      2
+    ],
+    "matched": 4,
+    "unmatched": 0,
+    "matched_median_m": 5.53,
+    "matched_worst_m": 6.18,
+    "center_drift_m": 8.7
+  },
+  {
+    "building": "SW1",
+    "floors": 3,
+    "verticals_per_floor": [
+      12,
+      7,
+      2
+    ],
+    "matched": 2,
+    "unmatched": 22,
+    "matched_median_m": 5.04,
+    "matched_worst_m": 5.04,
+    "center_drift_m": 27.6
+  },
+  {
+    "building": "NE9",
+    "floors": 2,
+    "verticals_per_floor": [
+      1,
+      1
+    ],
+    "matched": 1,
+    "unmatched": 0,
+    "matched_median_m": 4.69,
+    "matched_worst_m": 4.69,
+    "center_drift_m": 9.9
+  },
+  {
+    "building": "SE2",
+    "floors": 3,
+    "verticals_per_floor": [
+      5,
+      2,
+      2
+    ],
+    "matched": 2,
+    "unmatched": 8,
+    "matched_median_m": 4.05,
+    "matched_worst_m": 4.05,
+    "center_drift_m": 12.8
+  },
+  {
+    "building": "NE1",
+    "floors": 4,
+    "verticals_per_floor": [
+      9,
+      16,
+      11,
+      7
+    ],
+    "matched": 15,
+    "unmatched": 12,
+    "matched_median_m": 4.02,
+    "matched_worst_m": 7.93,
+    "center_drift_m": 14.6
+  },
+  {
+    "building": "SE14",
+    "floors": 3,
+    "verticals_per_floor": [
+      6,
+      3,
+      3
+    ],
+    "matched": 7,
+    "unmatched": 5,
+    "matched_median_m": 3.9,
+    "matched_worst_m": 7.78,
+    "center_drift_m": 3.8
+  },
+  {
+    "building": "SW2",
+    "floors": 3,
+    "verticals_per_floor": [
+      4,
+      3,
+      2
+    ],
+    "matched": 4,
+    "unmatched": 4,
+    "matched_median_m": 3.83,
+    "matched_worst_m": 3.98,
+    "center_drift_m": 7.9
+  },
+  {
+    "building": "NW4",
+    "floors": 4,
+    "verticals_per_floor": [
+      2,
+      4,
+      8,
+      2
+    ],
+    "matched": 3,
+    "unmatched": 3,
+    "matched_median_m": 3.61,
+    "matched_worst_m": 6.08,
+    "center_drift_m": 6.5
+  },
+  {
+    "building": "SE40",
+    "floors": 2,
+    "verticals_per_floor": [
+      4,
+      6
+    ],
+    "matched": 4,
+    "unmatched": 0,
+    "matched_median_m": 2.07,
+    "matched_worst_m": 2.1,
+    "center_drift_m": 1.6
+  },
+  {
+    "building": "SW5",
+    "floors": 2,
+    "verticals_per_floor": [
+      2,
+      2
+    ],
+    "matched": 2,
+    "unmatched": 0,
+    "matched_median_m": 1.63,
+    "matched_worst_m": 1.63,
+    "center_drift_m": 1.9
+  },
+  {
+    "building": "CARI",
+    "floors": 2,
+    "verticals_per_floor": [
+      2,
+      4
+    ],
+    "matched": 0,
+    "unmatched": 2,
+    "matched_median_m": null,
+    "matched_worst_m": null,
+    "center_drift_m": 9.6
+  },
+  {
+    "building": "NE12",
+    "floors": 2,
+    "verticals_per_floor": [
+      1,
+      1
+    ],
+    "matched": 0,
+    "unmatched": 1,
+    "matched_median_m": null,
+    "matched_worst_m": null,
+    "center_drift_m": 16.1
+  },
+  {
+    "building": "NE2",
+    "floors": 2,
+    "verticals_per_floor": [
+      2,
+      2
+    ],
+    "matched": 0,
+    "unmatched": 2,
+    "matched_median_m": null,
+    "matched_worst_m": null,
+    "center_drift_m": 11.9
+  },
+  {
+    "building": "NE20",
+    "floors": 2,
+    "verticals_per_floor": [
+      3,
+      2
+    ],
+    "matched": 0,
+    "unmatched": 3,
+    "matched_median_m": null,
+    "matched_worst_m": null,
+    "center_drift_m": 23.3
+  },
+  {
+    "building": "NE3",
+    "floors": 2,
+    "verticals_per_floor": [
+      0,
+      0
+    ],
+    "matched": 0,
+    "unmatched": 0,
+    "matched_median_m": null,
+    "matched_worst_m": null,
+    "center_drift_m": 4.3
+  },
+  {
+    "building": "NE4",
+    "floors": 2,
+    "verticals_per_floor": [
+      7,
+      0
+    ],
+    "matched": 0,
+    "unmatched": 7,
+    "matched_median_m": null,
+    "matched_worst_m": null,
+    "center_drift_m": 25.4
+  },
+  {
+    "building": "NE6",
+    "floors": 2,
+    "verticals_per_floor": [
+      0,
+      5
+    ],
+    "matched": 0,
+    "unmatched": 0,
+    "matched_median_m": null,
+    "matched_worst_m": null,
+    "center_drift_m": 9.9
+  },
+  {
+    "building": "NE8",
+    "floors": 2,
+    "verticals_per_floor": [
+      4,
+      0
+    ],
+    "matched": 0,
+    "unmatched": 4,
+    "matched_median_m": null,
+    "matched_worst_m": null,
+    "center_drift_m": 4.7
+  },
+  {
+    "building": "NW3",
+    "floors": 2,
+    "verticals_per_floor": [
+      2,
+      3
+    ],
+    "matched": 0,
+    "unmatched": 2,
+    "matched_median_m": null,
+    "matched_worst_m": null,
+    "center_drift_m": 12.9
+  },
+  {
+    "building": "NW5",
+    "floors": 2,
+    "verticals_per_floor": [
+      0,
+      0
+    ],
+    "matched": 0,
+    "unmatched": 0,
+    "matched_median_m": null,
+    "matched_worst_m": null,
+    "center_drift_m": 3.6
+  },
+  {
+    "building": "NW6",
+    "floors": 2,
+    "verticals_per_floor": [
+      2,
+      1
+    ],
+    "matched": 0,
+    "unmatched": 2,
+    "matched_median_m": null,
+    "matched_worst_m": null,
+    "center_drift_m": 5.3
+  },
+  {
+    "building": "SE10",
+    "floors": 2,
+    "verticals_per_floor": [
+      3,
+      0
+    ],
+    "matched": 0,
+    "unmatched": 3,
+    "matched_median_m": null,
+    "matched_worst_m": null,
+    "center_drift_m": 2.9
+  },
+  {
+    "building": "SE12",
+    "floors": 4,
+    "verticals_per_floor": [
+      0,
+      3,
+      5,
+      5
+    ],
+    "matched": 0,
+    "unmatched": 0,
+    "matched_median_m": null,
+    "matched_worst_m": null,
+    "center_drift_m": 32.0
+  },
+  {
+    "building": "SE42",
+    "floors": 2,
+    "verticals_per_floor": [
+      0,
+      12
+    ],
+    "matched": 0,
+    "unmatched": 0,
+    "matched_median_m": null,
+    "matched_worst_m": null,
+    "center_drift_m": 3.9
+  },
+  {
+    "building": "SE6",
+    "floors": 3,
+    "verticals_per_floor": [
+      1,
+      2,
+      1
+    ],
+    "matched": 0,
+    "unmatched": 2,
+    "matched_median_m": null,
+    "matched_worst_m": null,
+    "center_drift_m": 5.0
+  },
+  {
+    "building": "SW3",
+    "floors": 4,
+    "verticals_per_floor": [
+      3,
+      8,
+      6,
+      11
+    ],
+    "matched": 0,
+    "unmatched": 9,
+    "matched_median_m": null,
+    "matched_worst_m": null,
+    "center_drift_m": 8.2
+  },
+  {
+    "building": "SW9",
+    "floors": 2,
+    "verticals_per_floor": [
+      2,
+      3
+    ],
+    "matched": 0,
+    "unmatched": 2,
+    "matched_median_m": null,
+    "matched_worst_m": null,
+    "center_drift_m": 10.3
+  }
+]

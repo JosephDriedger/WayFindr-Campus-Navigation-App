@@ -8,7 +8,7 @@
             <% if(page === 'index'){ %>
             <span class="active">Home</span>
             <% } else { %>
-            <a href="/" class="<%= page === 'index' ? 'active' : '' %>">Home</a>
+            <a href="/">Home</a>
             <% } %>
         </li>
 
@@ -16,15 +16,15 @@
             <% if(page === 'map'){ %>
             <span class="active">Map</span>
             <% } else { %>
-            <a href="/map" class="<%= page === 'map' ? 'active' : '' %>">Map</a>
+            <a href="/map">Map</a>
             <% } %>
         </li>
 
         <li>
-            <% if(page === 'nodes'){ %>
-            <span class="active">Nodes</span>
+            <% if(page === 'schedule'){ %>
+            <span class="active">Schedule</span>
             <% } else { %>
-            <a href="/nodes" class="<%= page === 'nodes' ? 'active' : '' %>">Nodes</a>
+            <a href="/schedule">Schedule</a>
             <% } %>
         </li>
 
@@ -32,23 +32,41 @@
           <% if(page === 'favorites'){ %>
             <span class="active">Favorites</span>
           <% } else { %>
-            <a href="/favorites" class="<%= page === 'favorites' ? 'active' : '' %>">Favorites</a>
+            <a href="/favorites">Favorites</a>
           <% } %>
         </li>
-        
+
+        <li>
+            <% if(page === 'admin'){ %>
+            <span class="active">Tracer</span>
+            <% } else { %>
+            <a href="/admin">Tracer</a>
+            <% } %>
+        </li>
+
         <li>
             <% if(page === 'about'){ %>
             <span class="active">About</span>
             <% } else { %>
-            <a href="/about" class="<%= page === 'about' ? 'active' : '' %>">About</a>
+            <a href="/about">About</a>
             <% } %>
         </li>
 
-        <!-- Login/Logout Link -->
+        <%
+          // Whether someone is signed in is a fact the SERVER already knows --
+          // req.session.user is what gates /map and /favorites. This used to be
+          // decided client-side from localStorage instead, so a signed-in user
+          // whose localStorage had been cleared saw a "Login" link that bounced
+          // them straight back to a page they already had access to.
+        %>
         <li id="authLink">
-          <a href="/auth/login" class="<%= page === 'login' ? 'active' : '' %>">Login</a>
+          <% if (typeof user !== "undefined" && user) { %>
+            <a href="#" id="logoutBtn">Log out</a>
+          <% } else { %>
+            <a href="/auth/login" class="<%= page === 'login' ? 'active' : '' %>">Login</a>
+          <% } %>
         </li>
-        
+
         </ul>
 
     </nav>
@@ -58,17 +76,14 @@
 <script src="/js/menu.js"></script>
 
 <script>
-  // Simple toggle for logout in menu if user authenticated (client-side)
   document.addEventListener('DOMContentLoaded', () => {
-    const user = localStorage.getItem('user');
-    const authLink = document.getElementById('authLink');
-    if (user && authLink) {
-      authLink.innerHTML = '<a href="#" id="logoutBtn">Logout</a>';
-      document.getElementById('logoutBtn').addEventListener('click', async () => {
-        localStorage.removeItem('user');
-        await fetch('/auth/sessionLogout', { method: 'POST' });
-        window.location.href = '/';
-      });
-    }
+    const logoutBtn = document.getElementById('logoutBtn');
+    if (!logoutBtn) return;
+    logoutBtn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      try { localStorage.removeItem('user'); } catch { /* private mode */ }
+      await fetch('/auth/sessionLogout', { method: 'POST' });
+      window.location.href = '/';
+    });
   });
 </script>

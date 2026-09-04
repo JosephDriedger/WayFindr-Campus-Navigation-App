@@ -64,6 +64,21 @@ describe("errorHandler Middleware", () => {
     expect(res.status).toHaveBeenCalledWith(500);
   });
 
+  // An error raised after the body has gone out -- a session write failing
+  // while a static file was being served -- used to throw
+  // ERR_HTTP_HEADERS_SENT from in here and take the process down.
+  test("does not answer a request that has already been answered", async () => {
+    res.headersSent = true;
+    const err = new Error("too late");
+
+    await errorHandler(err, req, res, next);
+
+    expect(res.status).not.toHaveBeenCalled();
+    expect(res.json).not.toHaveBeenCalled();
+    expect(next).toHaveBeenCalledWith(err);
+    expect(mockLoggerError).toHaveBeenCalledWith("GET /test -> too late");
+  });
+
   test("defaults message if none provided", async () => {
     const err = {};
     await errorHandler(err, req, res, next);

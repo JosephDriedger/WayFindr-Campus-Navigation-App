@@ -10,10 +10,19 @@ body, ul {
    TYPOGRAPHY & GLOBAL STYLES
 ======================= */
 body {
-  font-family: Arial, sans-serif;
+  /* the map sidebar already renders in the system UI stack, so the pages
+     around it were the only part of the app still in Arial */
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    Helvetica, Arial, sans-serif;
   line-height: 1.6;
-  text-align: center; /* center text globally */
+  color: #1f2937;
+  background: #ffffff;
+  -webkit-font-smoothing: antialiased;
 }
+
+/* Centring used to be set on <body> for the whole app, which meant every
+   panel of left-reading content -- forms, room lists, route steps -- had to
+   undo it. Blocks that want to be centred now say so. */
 
 /* =======================
    NAVIGATION
@@ -34,8 +43,10 @@ header {
 
 .site-title {
   color: #fff;
-  font-size: 2rem;
-  margin: 0.5rem;
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin: 0.4rem;
 }
 
 nav {
@@ -47,27 +58,29 @@ nav {
 .nav-menu {
   display: flex;
   justify-content: center;
-  gap: 1rem;
+  gap: 0.35rem;
   list-style: none;
-  margin: 1rem;
+  margin: 0.6rem 1rem 0.9rem;
   padding: 0;
 }
 
+/* Every item used to be a filled dark box, so the bar read as a row of
+   buttons with nothing marking where you actually are. Links are quiet; the
+   current page is the only thing that gets a solid chip. */
 .nav-menu li a {
   display: block;
-  background: #005f99;
-  color: #fff;
-  padding: 0.75rem 1.5rem;
-  border-radius: 6px;
+  background: transparent;
+  color: #e0f0fb;
+  padding: 0.55rem 1.1rem;
+  border-radius: 999px;
   text-decoration: none;
-  font-weight: bold;
-  transition: background 0.3s ease;
+  font-weight: 600;
+  transition: background 0.2s ease, color 0.2s ease;
 }
 
-.nav-menu li a:hover,
-.nav-menu li a.active {
-  background: #003f66;
-  font-weight: bold;
+.nav-menu li a:hover {
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
 }
 
 .nav-toggle {
@@ -82,11 +95,11 @@ nav {
 
 .nav-menu li span.active {
   display: block;
-  background: #003f66;
-  color: #fff;
-  padding: 0.75rem 1.5rem;
-  border-radius: 6px;
-  font-weight: bold;
+  background: #fff;
+  color: #005f99;
+  padding: 0.55rem 1.1rem;
+  border-radius: 999px;
+  font-weight: 700;
 }
 
 /* =======================
@@ -97,8 +110,11 @@ nav {
   display: flex;
   align-items: top;
   justify-content: center;
-  background: linear-gradient(to right, #e6f3ff, #ffffff);
+  /* was a left-to-right gradient, so the tint sat on one side while the
+     content sat in the middle -- it read as though the page was off-centre */
+  background: linear-gradient(180deg, #eaf4fd 0%, #ffffff 100%);
   padding: 2rem;
+  text-align: center;
 }
 
 .hero-content {
@@ -142,7 +158,7 @@ nav {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(to right, #ffffff, #e6f3ff);
+  background: linear-gradient(180deg, #eaf4fd 0%, #ffffff 100%);
   padding: 2rem;
 }
 
@@ -188,74 +204,6 @@ nav {
 }
 
 /* =======================
-   NODES PAGE
-======================= */
-.nodes {
-  min-height: 80vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(to right, #f0f8ff, #ffffff);
-  padding: 2rem;
-}
-
-.nodes-content {
-  max-width: 700px;
-  text-align: center;
-}
-
-.node-form, .node-list {
-  margin-top: 1rem;
-}
-
-.node-form input {
-  display: block;
-  width: 80%;
-  margin: 0.5rem;
-  padding: 0.5rem;
-  border-radius: 5px;
-  border: 1px solid #ccc;
-}
-
-.node-form button {
-  margin-top: 1rem;
-}
-
-.node-list ul {
-  list-style: none;
-  padding: 0;
-}
-
-.node-list li {
-  background: #007acc;
-  color: #fff;
-  padding: 0.75rem;
-  border-radius: 6px;
-  margin: 0.5rem 0;
-}
-
-/* =======================
-   MAP PAGE
-======================= */
-.map-page {
-  min-height: 80vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(to right, #f0f8ff, #ffffff);
-  padding: 10px;
-}
-
-.map-container {
-  width: 100%;
-  max-width: 1000px;
-  height: 600px;
-  border: 3px solid #007acc;
-  border-radius: 8px;
-  margin: 5px;
-}
-
-/* =======================
    LOGIN FORM
 ======================= */
 .login-form {
@@ -289,7 +237,7 @@ nav {
   min-height: 80vh;
   display: flex;
   justify-content: center;
-  background: linear-gradient(to right, #f0f8ff, #ffffff);
+  background: linear-gradient(180deg, #eaf4fd 0%, #ffffff 100%);
   padding: 2rem;
 }
 
@@ -392,16 +340,6 @@ nav {
     display: flex;
   }
 
-  /* Map Container */
-  .map-container {
-    height: 400px;
-  }
-
-  /* Node Form Input */
-  .node-form input {
-    width: 95%;
-  }
-
   /* Team Members */
   .team {
     flex-direction: column;
@@ -410,5 +348,482 @@ nav {
 
   .team-member {
     width: 80%;
+  }
+}
+
+/* =======================
+   NOT FOUND PAGE
+======================= */
+.notfound-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: center;
+  margin-top: 1.5rem;
+}
+
+.notfound-links .btn.secondary {
+  background: #fff;
+  color: #007acc;
+  border: 1px solid #bfdbfe;
+}
+
+.notfound-links .btn.secondary:hover {
+  background: #eff6ff;
+}
+
+/* =======================
+   HOME PAGE
+======================= */
+.home {
+  padding-bottom: 4rem;
+}
+
+/* the hero no longer needs to fill the viewport: there is real content under
+   it now, and 80vh of gradient just pushed it off the screen */
+.home .hero {
+  min-height: 0;
+  padding: 3rem 2rem 3.5rem;
+}
+
+.home-search {
+  display: flex;
+  gap: 0.6rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin: 1.75rem auto 0;
+  max-width: 520px;
+}
+
+.home-search input {
+  flex: 1 1 260px;
+  min-width: 0;
+  padding: 0.8rem 1rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font: inherit;
+  background: #fff;
+}
+
+.home-search input:focus {
+  outline: 2px solid #007acc;
+  outline-offset: -1px;
+  border-color: transparent;
+}
+
+.home-search .btn {
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+}
+
+.hero-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: center;
+  margin-top: 1.25rem;
+}
+
+.btn.secondary {
+  background: #fff;
+  color: #007acc;
+  border: 1px solid #bfdbfe;
+}
+
+.btn.secondary:hover {
+  background: #eff6ff;
+}
+
+/* --- Coverage numbers --- */
+/* Columns sized to their own content (43px under "87", 142px under "rooms
+   you can search") with a fixed gap made the row look scattered. Equal
+   columns line the numbers up on a grid. */
+.home-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 2.25rem 2rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  text-align: center;
+}
+
+.stat-number {
+  font-size: 2.4rem;
+  font-weight: 700;
+  line-height: 1;
+  color: #007acc;
+}
+
+.stat-label {
+  font-size: 0.9rem;
+  color: #6b7280;
+}
+
+/* --- Feature grid --- */
+.home-features,
+.home-how {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 3rem 2rem 0;
+}
+
+.home-features h3,
+.home-how h3 {
+  font-size: 1.5rem;
+  color: #007acc;
+  margin: 0 0 1.5rem;
+  text-align: center; /* "What you can do" was centred, "Where the maps come
+                         from" was left -- pick one */
+}
+
+/* Four cards in a three-across grid leaves one stranded on its own row, so
+   this is a deliberate 2x2 rather than an auto-fit. */
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.25rem;
+  text-align: left;
+}
+
+@media (max-width: 700px) {
+  .feature-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.feature {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 1.25rem 1.35rem;
+}
+
+.feature h4 {
+  margin: 0 0 0.5rem;
+  font-size: 1.05rem;
+  color: #111827;
+}
+
+.feature p {
+  margin: 0;
+  color: #4b5563;
+  line-height: 1.6;
+}
+
+.home-how {
+  max-width: 760px;
+  text-align: left;
+}
+
+.home-how p {
+  color: #4b5563;
+  line-height: 1.7;
+}
+
+.home-note {
+  margin-top: 1rem;
+  padding: 0.9rem 1.1rem;
+  background: #f8fafc;
+  border-left: 3px solid #bfdbfe;
+  border-radius: 0 6px 6px 0;
+  font-size: 0.94rem;
+}
+
+@media (max-width: 600px) {
+  .hero-links .btn,
+  .notfound-links .btn,
+  .home-search .btn {
+    width: 100%;
+    text-align: center;
+  }
+
+  .home-stats {
+    gap: 1.75rem;
+  }
+
+  .stat-number {
+    font-size: 2rem;
+  }
+}
+
+/* =======================
+   SCHEDULE PAGE
+======================= */
+.schedule {
+  padding: 2.5rem 1.5rem 4rem;
+  background: linear-gradient(180deg, #eaf4fd 0%, #ffffff 100%);
+  min-height: 80vh;
+}
+
+.schedule-content {
+  max-width: 780px;
+  margin: 0 auto;
+  text-align: left;
+}
+
+.schedule-content h2 {
+  margin: 0 0 0.4rem;
+  font-size: 1.9rem;
+  color: #007acc;
+}
+
+.schedule-lede {
+  margin: 0 0 1.75rem;
+  color: #4b5563;
+}
+
+.schedule-content h3 {
+  font-size: 1.1rem;
+  color: #111827;
+  margin: 0 0 0.9rem;
+}
+
+/* --- What's on now: the reason the page exists, so it leads --- */
+.now-next {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.now-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 1.1rem 1.25rem;
+}
+
+.now-card.is-now {
+  border-color: #007acc;
+  box-shadow: 0 0 0 3px rgba(0, 122, 204, 0.12);
+}
+
+.now-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #6b7280;
+}
+
+.now-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #111827;
+  margin-top: 0.15rem;
+}
+
+.now-meta {
+  color: #4b5563;
+  margin-bottom: 0.9rem;
+}
+
+.now-card .btn {
+  padding: 0.5rem 1rem;
+  font-size: 0.92rem;
+}
+
+/* --- Add a class --- */
+.schedule-add,
+.schedule-list-section {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 1.4rem 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.class-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem;
+  align-items: end;
+}
+
+.class-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-weight: 600;
+  color: #374151;
+  font-size: 0.9rem;
+}
+
+.class-field-wide {
+  grid-column: span 2;
+}
+
+.class-field input {
+  padding: 0.6rem 0.8rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font: inherit;
+  font-weight: 400;
+}
+
+.class-field input:focus,
+.class-days input:focus-visible {
+  outline: 2px solid #007acc;
+  outline-offset: -1px;
+  border-color: transparent;
+}
+
+.class-days {
+  grid-column: span 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 0.6rem 0.9rem 0.8rem;
+  margin: 0;
+}
+
+.class-days legend {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #374151;
+  padding: 0 0.3rem;
+}
+
+.class-days label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: #374151;
+}
+
+.class-form .btn {
+  grid-column: span 2;
+  justify-self: start;
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+}
+
+.class-form .btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* --- The week --- */
+.day-group {
+  margin-bottom: 1.25rem;
+}
+
+.day-group:last-child {
+  margin-bottom: 0;
+}
+
+.day-group h4 {
+  margin: 0 0 0.4rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #6b7280;
+}
+
+.class-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid #e5e7eb;
+}
+
+.class-row {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 0.65rem 0;
+  border-bottom: 1px solid #e5e7eb;
+  flex-wrap: wrap;
+}
+
+.class-time {
+  flex: 0 0 9.5rem;
+  color: #6b7280;
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.class-name {
+  flex: 1 1 8rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.class-room {
+  /* keep the room off the action links rather than butting against them */
+  flex: 0 0 auto;
+  min-width: 6rem;
+  text-align: right;
+  color: #4b5563;
+}
+
+.class-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+.class-go {
+  color: #007acc;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.class-go:hover {
+  text-decoration: underline;
+}
+
+.class-remove {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: #b91c1c;
+  cursor: pointer;
+}
+
+.class-remove:hover {
+  text-decoration: underline;
+}
+
+.schedule-empty,
+.schedule-loading {
+  color: #6b7280;
+  margin: 0;
+}
+
+.schedule-error {
+  color: #b91c1c;
+  font-weight: 600;
+  margin: 0.75rem 0 0;
+}
+
+@media (max-width: 600px) {
+  .class-form {
+    grid-template-columns: 1fr;
+  }
+
+  .class-field-wide,
+  .class-days,
+  .class-form .btn {
+    grid-column: span 1;
+  }
+
+  .class-time {
+    flex-basis: 100%;
   }
 }

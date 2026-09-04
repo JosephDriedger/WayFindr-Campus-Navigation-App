@@ -21,7 +21,7 @@ router.get("/", async (req, res) => {
     res.json(nodes);
   } catch (err) {
     console.error("Error fetching nodes:", err);
-    res.status(500).json({ error: "Failed to load nodes" });
+    res.status(500).json({ error: "Failed to Load Nodes" });
   }
 });
 
@@ -41,7 +41,7 @@ router.get("/", async (req, res) => {
     res.json(nodes);
   } catch (err) {
     console.error("Error loading nodes:", err);
-    res.status(500).json({ error: "Failed to load nodes." });
+    res.status(500).json({ error: "Failed to Load Nodes." });
   }
 });
 

@@ -9,13 +9,100 @@
 <body>
   <%- include('_menu', { page: 'index' }) %>
 
-  <!-- Hero Section -->
-  <main class="hero">
-    <div class="hero-content">
-      <h2>Welcome to Campus Map Navigator</h2>
-      <p>Explore the BCIT campus, manage nodes, and discover shortest routes with ease.</p>
-      <a href="/map" class="btn">Get Started</a>
-    </div>
+  <!-- Hero: the search box is the front door, so it goes first. Typing a room
+       here lands straight on it, rather than making people open the map and
+       search again once they get there. -->
+  <main class="home">
+    <section class="hero">
+      <div class="hero-content">
+        <h2>Find Your Way Around BCIT</h2>
+        <p>
+          Search any room on the Burnaby campus, see it drawn on its floor plan,
+          and get walking directions to the door.
+        </p>
+
+        <form class="home-search" action="/map" method="get">
+          <input type="text" name="room" placeholder="Room or building, e.g. SW3-1600" aria-label="Room or building">
+          <button type="submit" class="btn">Search</button>
+        </form>
+
+        <div class="hero-links">
+          <a href="/map" class="btn secondary">Browse the Map</a>
+          <a href="/favorites" class="btn secondary">Your Favourites</a>
+        </div>
+      </div>
+    </section>
+
+    <% if (coverage) { %>
+    <section class="home-stats">
+      <div class="stat">
+        <span class="stat-number"><%= coverage.buildings %></span>
+        <span class="stat-label">buildings mapped</span>
+      </div>
+      <div class="stat">
+        <span class="stat-number"><%= coverage.floors %></span>
+        <span class="stat-label">floors</span>
+      </div>
+      <div class="stat">
+        <span class="stat-number"><%= coverage.rooms.toLocaleString('en-CA') %></span>
+        <span class="stat-label">rooms you can search</span>
+      </div>
+    </section>
+    <% } %>
+
+    <section class="home-features">
+      <h3>What You Can Do</h3>
+      <div class="feature-grid">
+        <article class="feature">
+          <h4>Search for a Room</h4>
+          <p>
+            Type a room number and go straight to it. Every room is drawn in
+            place on its own floor plan, so you can see what it is next to
+            before you set off.
+          </p>
+        </article>
+        <article class="feature">
+          <h4>Move Between Floors</h4>
+          <p>
+            Pick a building and step through its floors. Each floor lists the
+            rooms on it, so you can find what you want without hunting across
+            the drawing.
+          </p>
+        </article>
+        <article class="feature">
+          <h4>Get Walking Directions</h4>
+          <p>
+            Give it two rooms and it routes between them along the corridors,
+            taking the stairs or the lift where the floors change, and draws
+            the path on the map.
+          </p>
+        </article>
+        <article class="feature">
+          <h4>Save the Places You Keep Going Back To</h4>
+          <p>
+            Star a room to keep it on your favourites list. This is the one
+            part that needs an account, since it is tied to you.
+          </p>
+        </article>
+      </div>
+    </section>
+
+    <section class="home-how">
+      <h3>Where the Maps Come From</h3>
+      <p>
+        The floor plans are built from BCIT's own published architectural
+        drawings. Each sheet is read, the rooms are traced from the walls, and
+        the result is fitted to the building's real footprint so a room on
+        screen sits where it does on campus. Corridors, doorways, stairs and
+        lifts are picked out of the same drawings, which is what makes indoor
+        routing possible.
+      </p>
+      <p class="home-note">
+        Room labels are read from the drawings automatically, so a few will be
+        wrong or missing. If a room looks off, it is the reading of the plan
+        that is wrong, not the building.
+      </p>
+    </section>
   </main>
 </body>
 </html>

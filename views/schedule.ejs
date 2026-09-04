@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= title %></title>
+  <link rel="stylesheet" href="/css/style.css">
+
+  <!-- Firebase config for front-end -->
+  <script>
+    window.firebaseConfig = {
+      apiKey: "<%= process.env.FIREBASE_API_KEY %>",
+      authDomain: "<%= process.env.FIREBASE_AUTH_DOMAIN %>",
+      projectId: "<%= process.env.FIREBASE_PROJECT_ID %>",
+      storageBucket: "<%= process.env.FIREBASE_STORAGE_BUCKET %>",
+      messagingSenderId: "<%= process.env.FIREBASE_MESSAGING_SENDER_ID %>",
+      appId: "<%= process.env.FIREBASE_APP_ID %>"
+    };
+  </script>
+</head>
+
+<body>
+  <%- include('_menu', { page: 'schedule', user: user }) %>
+
+  <main class="schedule">
+    <div class="schedule-content">
+      <h2>Your Schedule</h2>
+      <p class="schedule-lede">
+        Add the classes you have to get to. When one is starting, the map offers
+        directions to that room without you having to look it up.
+      </p>
+
+      <!-- What's on now, or next. This is the reason the schedule exists, so
+           it sits above the list rather than under it. -->
+      <section id="nowNext" class="now-next" hidden></section>
+
+      <section class="schedule-add">
+        <h3>Add a Class</h3>
+        <form id="classForm" class="class-form" autocomplete="off">
+          <label class="class-field class-field-wide">
+            <span>Class</span>
+            <input type="text" name="title" placeholder="COMP 7082" required>
+          </label>
+          <label class="class-field class-field-wide">
+            <span>Room</span>
+            <input type="text" name="room" placeholder="SW3-1600" required>
+          </label>
+
+          <fieldset class="class-days">
+            <legend>Days</legend>
+            <label><input type="checkbox" name="day" value="1"> Mon</label>
+            <label><input type="checkbox" name="day" value="2"> Tue</label>
+            <label><input type="checkbox" name="day" value="3"> Wed</label>
+            <label><input type="checkbox" name="day" value="4"> Thu</label>
+            <label><input type="checkbox" name="day" value="5"> Fri</label>
+            <label><input type="checkbox" name="day" value="6"> Sat</label>
+            <label><input type="checkbox" name="day" value="0"> Sun</label>
+          </fieldset>
+
+          <label class="class-field">
+            <span>Starts</span>
+            <input type="time" name="startTime" value="09:30" required>
+          </label>
+          <label class="class-field">
+            <span>Ends</span>
+            <input type="time" name="endTime" value="10:20" required>
+          </label>
+
+          <button type="submit" class="btn">Add Class</button>
+        </form>
+        <p id="formError" class="schedule-error" hidden></p>
+      </section>
+
+      <section class="schedule-list-section">
+        <h3>Your Week</h3>
+        <div id="scheduleList" class="schedule-list">
+          <p class="schedule-loading">Loading your schedule…</p>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script type="module" src="/js/schedule.js"></script>
+</body>
+
+</html>

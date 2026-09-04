@@ -18,6 +18,15 @@ export async function errorHandler(err, req, res, _next) {
     });
   }
 
+  // The response may already have gone out -- an error raised after the body
+  // was sent (a session write failing while a static file was being served,
+  // say) reached here and threw ERR_HTTP_HEADERS_SENT, which took the whole
+  // process down. Nothing can be said to the client at that point, so hand
+  // back to Express to close the connection.
+  if (res.headersSent) {
+    return _next(err);
+  }
+
   // Client response
   res.status(statusCode).json({
     error: true,

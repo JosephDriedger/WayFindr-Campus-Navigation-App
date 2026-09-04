@@ -3,3 +3,32 @@ node_modules
 *.log
 logs\\.8d52bee2aa2383472b7011d34fa6447b51e1e050-audit.json
 logs/.8d52bee2aa2383472b7011d34fa6447b51e1e050-audit.json
+.sessions/
+
+# Claude Code workspace files (agent config, local settings, scratch)
+.claude/
+CLAUDE.md
+
+# IDE settings -- personal to whoever opened the project, not part of it
+.idea/
+.vscode/
+
+# Python bytecode from the floorPlans scripts
+__pycache__/
+*.py[cod]
+
+# Backups the tracing tools keep before they touch a traced file. They are
+# there so a bad run can be undone locally; the file they protect is the one
+# that belongs in the repo.
+*.bak
+public/data/floor-coordinates/*.bak
+public/data/floor-coordinates/*.[0-9]*-[0-9]*.bak
+
+# Working output from the floor plan pipeline: diagnostic renders, discarded
+# extraction attempts, and the copies kept while promoting a batch. All of it
+# is reproducible from the scripts and none of it is the deliverable.
+floorPlans/_diag/
+floorPlans/_discarded_auto/
+floorPlans/_prev_live/
+floorPlans/_manual_backup/
+

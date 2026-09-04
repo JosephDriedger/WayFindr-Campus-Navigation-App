@@ -35,7 +35,9 @@ describe("Public routes", () => {
 });
 
 describe("Protected routes (check session redirect)", () => {
-  const protectedRoutes = ["/map", "/bcit-map", "/nodes", "/favorites"];
+  // Only what is saved against a profile needs an account; the map itself is
+  // public, so a visitor can find a room without signing up.
+  const protectedRoutes = ["/favorites", "/schedule"];
 
   protectedRoutes.forEach(route => {
     test(`GET ${route} redirects when session missing`, async () => {
@@ -43,12 +45,18 @@ describe("Protected routes (check session redirect)", () => {
       expect(res.status).toBe(302);
     });
   });
+
+  test("GET /map is reachable without a session", async () => {
+    const res = await request(app).get("/map");
+    expect(res.status).toBe(200);
+  });
 });
 
-describe("Catch-all route", () => {
-  test("GET /some/random/path redirects to /", async () => {
+describe("Unknown routes", () => {
+  // These used to redirect silently to "/", which hid typos and dead links.
+  test("GET /some/random/path returns a 404 page naming the path", async () => {
     const res = await request(app).get("/some/random/path");
-    expect(res.status).toBe(302);
-    expect(res.header.location).toBe("/");
+    expect(res.status).toBe(404);
+    expect(res.text).toContain("/some/random/path");
   });
 });

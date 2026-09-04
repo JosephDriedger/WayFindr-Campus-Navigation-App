@@ -20,7 +20,7 @@ async function ensureUserDoc(req, res, next) {
     req.userModel = user;
     next();
   } catch (err) {
-    console.error("ensureUserDoc error:", err);
+    console.error("ensureUserDoc Error:", err);
     next(err);
   }
 }
@@ -84,7 +84,7 @@ router.delete("/:nodeId", verifyFirebaseToken, ensureUserDoc, async (req, res, n
   try {
     const { nodeId } = req.params;
     await req.userModel.removeFavorite(nodeId);
-    res.json({ message: "Favorite removed", nodeId });
+    res.json({ message: "Favorite Removed", nodeId });
   } catch (err) {
     next(err);
   }

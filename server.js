@@ -9,8 +9,11 @@ import route from "./routes/route.js";
 import nodeRoutes from "./routes/nodes.js";
 import authRouter from './routes/auth.js';
 import favoritesRouter from "./routes/favorites.js";
+import scheduleRouter from "./routes/schedule.js";
+import adminRouter from "./routes/admin.js";
 import calibratorRouter from "./routes/calibrator.js";
 
+import FileSessionStore from "./services/sessionStore.js";
 import { requestLogger } from "./middleware/logger.js";
 import { errorHandler } from './middleware/errorHandler.js';
 import admin from './config/firebase.js';
@@ -28,17 +31,6 @@ const db = admin.firestore();
 app.use(express.json());
 app.use(requestLogger);
 
-app.use(session({
-  secret: process.env.SESSION_SECRET || "keyboard cat",
-  resave: false,
-  saveUninitialized: false,
-  cookie: {
-    httpOnly: true,
-    secure: false, // true if using HTTPS
-    maxAge: 1000 * 60 * 60 * 24 * 5 // 5 days
-  }
-}));
-
 const mapboxDistDir = path.dirname(require.resolve("mapbox-gl/dist/mapbox-gl.js"));
 
 app.use(
@@ -50,6 +42,48 @@ app.use(
 );
 
 app.use(express.static(path.join(__dirname, "public")));
+// Static files are served before sessions are touched. With rolling sessions
+// every request re-writes the session file, and a page pulling in a dozen
+// assets meant a dozen pointless writes racing each other -- on Windows that
+// surfaced as EPERM when two renames landed on the same file at once.
+// Sessions survive a restart. The default MemoryStore holds them in the
+// process, so every restart signed everybody out -- and nodemon restarts on
+// every file save, which is why staying logged in was impossible while
+// working on the app.
+const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 5; // 5 days
+const isProduction = process.env.NODE_ENV === "production";
+
+if (isProduction) {
+  // so secure cookies work behind a TLS-terminating proxy
+  app.set("trust proxy", 1);
+}
+
+if (!process.env.SESSION_SECRET) {
+  console.warn(
+    "[session] SESSION_SECRET is not set; using a default. Set one before deploying."
+  );
+}
+
+app.use(session({
+  name: "wayfindr.sid",
+  secret: process.env.SESSION_SECRET || "keyboard cat",
+  resave: false,
+  saveUninitialized: false,
+  rolling: true, // an active user should not be signed out mid-session
+  store: new FileSessionStore({
+    dir: path.join(__dirname, ".sessions"),
+    ttlMs: SESSION_TTL_MS,
+  }),
+  cookie: {
+    httpOnly: true,
+    // A secure cookie is dropped outright over plain http, so hard-coding it
+    // meant the browser silently kept nothing on localhost.
+    secure: isProduction,
+    sameSite: "lax",
+    maxAge: SESSION_TTL_MS,
+  },
+}));
+
 app.set("view engine", "ejs");
 app.use(express.urlencoded({ extended: true }));
 
@@ -57,6 +91,8 @@ app.use("/calibrator", calibratorRouter);
 app.use('/auth', authRouter);
 app.use("/api/nodes", nodeRoutes(db));
 app.use("/api/favorites", favoritesRouter);
+app.use("/api/schedule", scheduleRouter);
+app.use("/admin", adminRouter);
 app.use('/', route);
 
 app.use(errorHandler);

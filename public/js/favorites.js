@@ -60,10 +60,16 @@ function renderFavorites(favorites) {
     labelSpan.textContent = displayLabel;
     labelSpan.style.cursor = "pointer"
 
-    // When clicked, go to map page and pass nodeId
+    // When clicked, go to the map focused on this favorite
     labelSpan.addEventListener("click", () => {
-      // Example: navigate to /map?nodeId=<id>
-      window.location.href = `/map`;
+      if (fav.nodeMeta?.kind === "room") {
+        const { building, floor, room } = fav.nodeMeta;
+        const q = new URLSearchParams({ building, room });
+        if (floor) q.set("floor", floor);
+        window.location.href = `/map?${q.toString()}`;
+      } else {
+        window.location.href = `/map`;
+      }
     });
 
     // Actions container

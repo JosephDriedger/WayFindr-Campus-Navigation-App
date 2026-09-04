@@ -6,78 +6,98 @@ body {
   padding: 0;
 }
 
-/* The Mapbox container – THIS NEEDS HEIGHT */
-#map {
-  position: relative;        /* so the search/floor panel position correctly */
+/* ----------------------------------------------------------------------
+   Shell: full-bleed map with a Google-Maps-style sidebar floating on top
+   (left column on desktop, bottom sheet on narrow screens).
+---------------------------------------------------------------------- */
+.map-shell {
+  position: relative;
   width: 100%;
-  height: 100%; /* adjust 140px if your header is taller/shorter */
-  /* or just use height: 100vh; if you want full screen */
+  height: 100%;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
-/* --- Search container (already inside #map) --- */
-.map-search {
+#map {
   position: absolute;
-  top: 10px;
-  left: 10px;
-  z-index: 30;
+  inset: 0;
+}
+
+.map-sidebar {
+  /* style.css centres text globally, which the sidebar inherited: place
+     names, room lists and route steps all came out centred. A panel of
+     lists reads from the left. */
+  text-align: left;
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 380px;
+  max-width: 92vw;
+  z-index: 25;
   background: #ffffff;
-  border-radius: 999px;        /* pill-style like Google Maps */
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
-  padding: 6px 10px;
+  box-shadow: 2px 0 12px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* --- Search bar: now a static pill at the top of the sidebar --- */
+.map-search {
+  position: relative;
+  flex: 0 0 auto;
+  margin: 12px 12px 8px;
+  background: #f1f3f4;
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06);
+  padding: 8px 12px;
   display: flex;
   align-items: center;
   gap: 6px;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-    sans-serif;
 }
 
-/* input inside the pill */
 .map-search input {
   border: none;
   outline: none;
+  background: transparent;
   font-size: 14px;
-  min-width: 220px;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
-/* 'Go' button – small circle on right */
 .map-search button {
   border: none;
-  background: #2563eb;
+  background: #1a73e8;
   color: #ffffff;
   border-radius: 999px;
-  padding: 4px 10px;
+  padding: 5px 12px;
   font-size: 13px;
   cursor: pointer;
   white-space: nowrap;
 }
 
 .map-search button:hover {
-  background: #1d4ed8;
+  background: #1558b3;
 }
 
-/* --- Suggestions dropdown --- */
+/* --- Suggestions dropdown: floats over the sidebar body below the bar --- */
 .map-search-suggestions {
   position: absolute;
-  top: 46px;                 /* just below the pill bar */
-  left: 10px;
+  top: 56px;
+  left: 12px;
+  right: 12px;
   z-index: 31;
   background: #ffffff;
   border-radius: 12px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.28);
   padding: 4px 0;
-  min-width: 280px;
-  max-width: 340px;
-  max-height: 260px;
+  max-height: 320px;
   overflow-y: auto;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-    sans-serif;
   font-size: 14px;
-  display: none;             /* toggled by JS */
+  display: none; /* toggled by JS */
 }
 
-/* each suggestion row */
 .map-search-suggestion {
-  padding: 6px 12px;
+  padding: 8px 12px;
   cursor: pointer;
   display: flex;
   flex-direction: column;
@@ -85,22 +105,19 @@ body {
 
 .map-search-suggestion:hover,
 .map-search-suggestion.is-active {
-  background: #e5f0ff;
+  background: #e8f0fe;
 }
 
-/* main line: name */
 .map-search-suggestion-title {
   font-weight: 500;
   color: #111827;
 }
 
-/* sub line: type / extra info */
 .map-search-suggestion-sub {
   font-size: 12px;
   color: #6b7280;
 }
 
-/* small section label (Buildings / Rooms) */
 .map-search-suggestion-section {
   padding: 6px 12px 4px;
   font-size: 11px;
@@ -109,9 +126,495 @@ body {
   color: #9ca3af;
 }
 
+/* --- Sidebar body: place cards / directions live here --- */
+.sidebar-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 4px 16px 16px;
+}
 
-/* Floor panel (from bcit-map-floors.js) – make sure it sits below the search bar */
-#bcit-floor-panel {
-  top: 52px !important; /* directly under search bar */
-  left: 10px;
+.sidebar-hint {
+  color: #6b7280;
+  font-size: 14px;
+  line-height: 1.5;
+  margin-top: 8px;
+}
+
+/* --- Browse panel: the sidebar's resting state --- */
+.browse-section {
+  margin: 14px 0 18px;
+}
+
+.browse-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin: 0 0 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #6b7280;
+}
+
+.browse-clear {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  color: #1a73e8;
+  cursor: pointer;
+}
+
+.browse-clear:hover {
+  text-decoration: underline;
+}
+
+.browse-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.browse-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.browse-row:hover,
+.browse-row:focus-visible {
+  background: #f3f4f6;
+}
+
+.browse-row-title {
+  font-weight: 600;
+  color: #111827;
+}
+
+.browse-row-sub {
+  flex: 0 0 auto;
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+.browse-directions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.browse-directions input {
+  padding: 9px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font: inherit;
+}
+
+.browse-directions input:focus {
+  outline: 2px solid #1a73e8;
+  outline-offset: -1px;
+  border-color: transparent;
+}
+
+.browse-go {
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: #1a73e8;
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.browse-go:hover {
+  background: #1558b3;
+}
+
+.browse-error {
+  margin: 8px 0 0;
+  font-size: 0.85rem;
+  color: #b91c1c;
+}
+
+/* --- Place card (building or room) --- */
+.place-card h2 {
+  margin: 4px 0 2px;
+  font-size: 1.4rem;
+  color: #111827;
+}
+
+/* What a space is called sits under its number: the number is the address,
+   the name is what you are actually looking for. */
+.place-card .place-name {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1a73e8;
+  margin-top: -2px;
+}
+
+.room-row-name em {
+  display: block;
+  font-style: normal;
+  font-size: 12px;
+  font-weight: 400;
+  color: #6b7280;
+}
+
+.browse-suggest-row em {
+  font-style: normal;
+  color: #6b7280;
+}
+
+.place-card .place-sub {
+  color: #6b7280;
+  font-size: 0.9rem;
+  margin-bottom: 12px;
+}
+
+.place-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.btn-primary {
+  border: none;
+  background: #1a73e8;
+  color: #fff;
+  border-radius: 999px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-primary:hover {
+  background: #1558b3;
+}
+
+.btn-icon {
+  border: 1px solid #dadce0;
+  background: #fff;
+  color: #3c4043;
+  border-radius: 999px;
+  width: 38px;
+  height: 38px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.btn-icon:hover {
+  background: #f1f3f4;
+}
+
+/* saving is the one thing that needs an account, so it reads as available
+   but not yet yours until you sign in */
+.btn-icon.is-signed-out {
+  opacity: 0.55;
+}
+
+.btn-icon.is-active {
+  background: #fef3c7;
+  border-color: #f59e0b;
+  color: #b45309;
+}
+
+/* --- Floor pills (building card) --- */
+.floor-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.floor-pill {
+  border: 1px solid #dadce0;
+  background: #fff;
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.floor-pill.active {
+  background: #1a73e8;
+  border-color: #1a73e8;
+  color: #fff;
+}
+
+/* --- Room list on the building card --- */
+.room-list-header {
+  margin: 14px 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #6b7280;
+}
+
+.room-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid #e5e7eb;
+}
+
+.room-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 9px 4px;
+  border: none;
+  border-bottom: 1px solid #e5e7eb;
+  background: transparent;
+  font: inherit;
+  font-size: 14px;
+  color: #111827;
+  text-align: left;
+  cursor: pointer;
+}
+
+.room-row:hover {
+  background: #e8f0fe;
+}
+
+.room-row-name {
+  font-weight: 500;
+}
+
+.room-row-type {
+  color: #6b7280;
+  font-size: 13px;
+}
+
+/* --- Directions view --- */
+.sidebar-back {
+  border: none;
+  background: transparent;
+  color: #1a73e8;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 4px 0;
+  margin-bottom: 8px;
+}
+
+.directions-endpoints {
+  border-left: 2px dotted #9ca3af;
+  margin: 8px 0 12px 6px;
+  padding-left: 14px;
+}
+
+.directions-endpoint {
+  position: relative;
+  padding: 6px 0;
+  font-size: 14px;
+  color: #111827;
+}
+
+.directions-endpoint::before {
+  content: "";
+  position: absolute;
+  left: -19px;
+  top: 12px;
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+}
+
+.directions-endpoint.from::before {
+  background: #1a73e8;
+}
+
+.directions-endpoint.to::before {
+  background: #ea4335;
+}
+
+.directions-summary {
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 6px;
+}
+
+.directions-error {
+  color: #b91c1c;
+  font-size: 13px;
+  background: #fef2f2;
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.directions-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid #e5e7eb;
+  counter-reset: step;
+}
+
+/* Floor headings live in the list to keep the sequence readable, but they
+   are not steps, so they must not take a step number. */
+.directions-steps li {
+  padding: 8px 0 8px 26px;
+  position: relative;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 14px;
+  color: #111827;
+  counter-increment: step;
+}
+
+.directions-steps li::before {
+  content: counter(step) ".";
+  position: absolute;
+  left: 0;
+  width: 20px;
+  text-align: right;
+  color: #9ca3af;
+}
+
+.directions-steps li.floor-heading {
+  font-weight: 600;
+  color: #6b7280;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: none;
+  padding: 12px 0 0;
+  counter-increment: none;
+}
+
+.directions-steps li.floor-heading::before {
+  content: none;
+}
+
+/* --- Narrow screens: sidebar becomes a bottom sheet, like Google Maps mobile --- */
+@media (max-width: 768px) {
+  .map-sidebar {
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: auto;
+    max-width: none;
+    max-height: 50vh;
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.25);
+  }
+}
+
+/* --- "You have a class now" banner, above the sidebar body --- */
+.class-banner {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 12px 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #e8f0fe;
+  border: 1px solid #c7dbfb;
+  font-size: 13px;
+  color: #17324f;
+}
+
+.class-banner-text {
+  flex: 1 1 auto;
+  line-height: 1.35;
+}
+
+.class-banner-go {
+  flex: 0 0 auto;
+  border: none;
+  background: #1a73e8;
+  color: #fff;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.class-banner-go:hover {
+  background: #1558b3;
+}
+
+/* Secondary action on a place card: a real label beats a bare icon */
+.btn-secondary {
+  border: 1px solid #dadce0;
+  background: #fff;
+  color: #3c4043;
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.btn-secondary:hover {
+  background: #f1f3f4;
+}
+
+/* the final leg of a route arrives; it does not send you walking on */
+.directions-steps li.step-arrive {
+  font-weight: 600;
+}
+
+/* --- Room suggestions under a directions box --- */
+.browse-directions {
+  position: relative;
+}
+
+.browse-suggest {
+  position: relative;
+  margin-top: -4px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.12);
+  overflow: hidden;
+  z-index: 5;
+}
+
+.browse-suggest-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.browse-suggest-row:hover,
+.browse-suggest-row.is-active {
+  background: #e8f0fe;
+}
+
+.browse-suggest-row small {
+  color: #6b7280;
+  flex: 0 0 auto;
 }

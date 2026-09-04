@@ -28,9 +28,30 @@ router.post('/sessionLogin', async (req, res, next) => {
     }
         
     const sessionCookie = await admin.auth().createSessionCookie(idToken, { expiresIn });
-    res.cookie('session', sessionCookie, { httpOnly: true, secure: true });
-    req.session.user = { idToken }; // minimal info to satisfy checkSession
-    res.json({ status: 'success' });
+    res.cookie('session', sessionCookie, {
+      httpOnly: true,
+      // secure: true was dropping this cookie on every plain-http request, so
+      // the Firebase session never survived the redirect in development
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: expiresIn,
+    });
+
+    // Who the user is, not just a token. The id token expires in an hour
+    // while the session lasts days, so storing only that left the app unable
+    // to say who was signed in for most of the session's life.
+    req.session.user = {
+      uid: decodedToken.uid,
+      email: decodedToken.email || null,
+      displayName: decodedToken.name || profile?.displayName || null,
+    };
+
+    // finish writing the session before answering, or a redirect that follows
+    // immediately can arrive before the session exists
+    req.session.save((saveErr) => {
+      if (saveErr) return next(saveErr);
+      res.json({ status: 'success' });
+    });
   } catch(err) {
     //res.status(401).json({ error: 'Invalid token' });
     next(err);
@@ -40,7 +61,10 @@ router.post('/sessionLogin', async (req, res, next) => {
 router.post('/sessionLogout', (req, res) => {
   req.session.destroy(err => {
     if (err) console.error(err);
+    // both cookies, or the browser keeps presenting a session id that no
+    // longer resolves to anything
     res.clearCookie('session');
+    res.clearCookie('wayfindr.sid');
     res.json({ status: 'logged out' });
   });
 });

@@ -3,110 +3,101 @@ import { jest } from "@jest/globals";
 import request from "supertest";
 import express from "express";
 
-// Mock the module AFTER import using jest.unstable_mockModule
-jest.unstable_mockModule("child_process", () => ({
-    execFile: jest.fn(),
+// Indoor routing now runs in-process against the room/corridor/door GeoJSON
+// (services/indoorGraph.js) instead of shelling out to a Python script, so
+// the controller only needs to be tested against that module's contract.
+jest.unstable_mockModule("../services/indoorGraph.js", () => ({
+    findIndoorPath: jest.fn(),
 }));
 
-// Re-import mocked version
-const { execFile } = await import("child_process");
-
+const { findIndoorPath } = await import("../services/indoorGraph.js");
 const { handlePathRequest } = await import("../controllers/pathfinderController.js");
 
-// Setup express app
 const app = express();
 app.use(express.json());
 app.post("/find-path", handlePathRequest);
 
 describe("Path Request Handler (handlePathRequest)", () => {
-    const validPayload = {
-        startBuildingCode: "SW03",
-        startRoom: "A101",
-        goalBuildingCode: "SW05",
-        goalRoom: "B202",
-    };
-
-    const mockPythonOutput =
-        "Path found: [49.251, -123.001], [49.252, -123.002]";
+    const mockPath = [
+        { building: "SW3", floor: "1", room: "1615", type: "room", coord: [-123.001, 49.251] },
+        { building: "SW3", floor: "1", room: "1990", type: "room", coord: [-123.002, 49.252] },
+    ];
 
     beforeEach(() => {
-        execFile.mockClear();
+        findIndoorPath.mockClear();
     });
 
-    test("calls python script with correct arguments", async () => {
-        execFile.mockImplementation((cmd, args, opts, cb) => {
-            cb(null, mockPythonOutput, "");
-        });
+    test("calls findIndoorPath with the building and both rooms", async () => {
+        findIndoorPath.mockReturnValue({ success: true, path: mockPath, distanceM: 42 });
 
-        await request(app).post("/find-path").send(validPayload);
+        await request(app)
+            .post("/find-path")
+            .send({ building: "SW3", startRoom: "1615", goalRoom: "1990" });
 
-        expect(execFile).toHaveBeenCalledTimes(1);
-        expect(execFile).toHaveBeenCalledWith(
-            "python3",
-            [
-                expect.any(String),
-                "sw", "03", "A101",
-                "sw", "05", "B202",
-            ],
-            expect.any(Object),
-            expect.any(Function)
-        );
+        expect(findIndoorPath).toHaveBeenCalledTimes(1);
+        expect(findIndoorPath).toHaveBeenCalledWith("SW3", "1615", "1990");
     });
 
-    test("returns 200 with success: true and script output", async () => {
-        execFile.mockImplementation((cmd, args, opts, cb) => {
-            cb(null, mockPythonOutput, "");
-        });
+    test("returns 200 with the route on success", async () => {
+        findIndoorPath.mockReturnValue({ success: true, path: mockPath, distanceM: 42 });
 
-        const res = await request(app).post("/find-path").send(validPayload);
+        const res = await request(app)
+            .post("/find-path")
+            .send({ building: "SW3", startRoom: "1615", goalRoom: "1990" });
 
         expect(res.status).toBe(200);
-        expect(res.body).toEqual({
-            success: true,
-            output: mockPythonOutput,
-        });
+        expect(res.body).toEqual({ success: true, path: mockPath, distanceM: 42 });
     });
 
-    test("returns 500 with success: false on exec error", async () => {
-        const mockError = new Error("Execution failed");
-        const mockStderr = "Python traceback: File not found.";
+    test("returns success: false with a message when no route exists", async () => {
+        findIndoorPath.mockReturnValue({ success: false, message: "No route found." });
 
-        execFile.mockImplementation((cmd, args, opts, cb) => {
-            cb(mockError, "", mockStderr);
-        });
+        const res = await request(app)
+            .post("/find-path")
+            .send({ building: "SW3", startRoom: "1615", goalRoom: "9999" });
 
-        const res = await request(app).post("/find-path").send(validPayload);
-
-        expect(res.status).toBe(500);
-        expect(res.body).toEqual({
-            success: false,
-            error: mockStderr,
-        });
+        expect(res.status).toBe(200);
+        expect(res.body).toEqual({ success: false, message: "No route found." });
+        expect(findIndoorPath).toHaveBeenCalledTimes(1);
     });
 
-    test("passes undefined for missing body params", async () => {
-        const partialPayload = {
-            startBuildingCode: "SE12",
-            goalBuildingCode: "SE14",
-        };
+    test("400s when startRoom/goalRoom are missing, without calling findIndoorPath", async () => {
+        const res = await request(app)
+            .post("/find-path")
+            .send({ building: "SW3" });
 
-        execFile.mockImplementation((cmd, args, opts, cb) => {
-            cb(null, "ok", "");
-        });
+        expect(res.status).toBe(400);
+        expect(res.body.success).toBe(false);
+        expect(findIndoorPath).not.toHaveBeenCalled();
+    });
 
-        await request(app).post("/find-path").send(partialPayload);
+    test("rejects cross-building requests without calling findIndoorPath", async () => {
+        const res = await request(app)
+            .post("/find-path")
+            .send({
+                startBuildingCode: "SW3",
+                goalBuildingCode: "SW5",
+                startRoom: "1615",
+                goalRoom: "1845",
+            });
 
-        expect(execFile).toHaveBeenCalledTimes(1);
+        expect(res.status).toBe(200);
+        expect(res.body.success).toBe(false);
+        expect(findIndoorPath).not.toHaveBeenCalled();
+    });
 
-        expect(execFile).toHaveBeenCalledWith(
-            expect.any(String),
-            [
-                expect.any(String),
-                "se", "12", undefined,
-                "se", "14", undefined,
-            ],
-            expect.any(Object),
-            expect.any(Function)
-        );
+    test("falls back to startBuildingCode/goalBuildingCode when building is omitted", async () => {
+        findIndoorPath.mockReturnValue({ success: true, path: mockPath, distanceM: 10 });
+
+        await request(app)
+            .post("/find-path")
+            .send({
+                startBuildingCode: "SW3",
+                goalBuildingCode: "SW3",
+                startRoom: "1615",
+                goalRoom: "1990",
+            });
+
+        expect(findIndoorPath).toHaveBeenCalledWith("SW3", "1615", "1990");
     });
 });

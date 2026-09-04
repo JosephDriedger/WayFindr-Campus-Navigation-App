@@ -4,10 +4,18 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>BCIT Campus Map</title>
+  <title><%= title %></title>
   <meta name="mapbox-token" content="<%- MAPBOX_TOKEN %>">
+  <link rel="stylesheet" href="/css/style.css">
   <link href="/vendor/mapbox-gl/mapbox-gl.css" rel="stylesheet" />
   <link rel="stylesheet" href="/css/bcit-map.css" />
+
+  <script>
+    // The map is public; only saving is tied to a profile. The page tells the
+    // client which it is, so the star can say so up front instead of letting
+    // someone click it and get an alert.
+    window.__SIGNED_IN__ = <%= (typeof user !== "undefined" && user) ? "true" : "false" %>;
+  </script>
 
   <!-- Firebase config for front-end -->
   <script>
@@ -21,21 +29,52 @@
     };
   </script>
 
+  <style>
+    /* Full-viewport map beneath the shared site header, instead of the
+       decorative fixed-size box the old /map page squeezed it into.
+       (Sidebar/map-shell layout itself lives in bcit-map.css.) */
+    html, body {
+      height: 100%;
+    }
+    body {
+      display: flex;
+      flex-direction: column;
+    }
+    .map-page {
+      flex: 1 1 auto;
+      min-height: 0;
+      position: relative;
+    }
+  </style>
 </head>
 
 <body>
-  <div id="map">
-    <!-- SEARCH BAR INSIDE MAP, TOP-LEFT -->
-    <div class="map-search">
-      <input
-        id="searchInput"
-        type="text"
-        placeholder="Search building or room (e.g., SW3 or SW3-1635)"
-      />
-      <button id="searchBtn">Go</button>
-    </div>
-  </div>
+  <%- include('_menu', { page: 'map' }) %>
 
+  <main class="map-page">
+    <div class="map-shell">
+      <div id="map"></div>
+
+      <aside id="map-sidebar" class="map-sidebar">
+        <div class="map-search">
+          <input
+            id="searchInput"
+            type="text"
+            placeholder="Search building or room (e.g., SW3 or SW3-1635)"
+          />
+          <button id="searchBtn">Go</button>
+        </div>
+
+        <!-- filled in only when the signed-in user has a class on now or
+             about to start; see showClassBanner() in bcit-map-core.js -->
+        <div id="class-banner" class="class-banner" hidden></div>
+
+        <div id="sidebar-body" class="sidebar-body">
+          <p class="sidebar-hint">Search for a building or room, or click one on the map, to get started.</p>
+        </div>
+      </aside>
+    </div>
+  </main>
 
   <script defer src="/vendor/mapbox-gl/mapbox-gl.js"></script>
   <script defer>window.MAPBOX_TOKEN = "<%- MAPBOX_TOKEN %>";</script>
@@ -44,7 +83,7 @@
   <script type="module" src="/js/bcit-map-core.js"></script>
   <script type="module" src="/js/bcit-map-floors.js"></script>
   <script type="module" src="/js/bcit-map-search.js"></script>
-  
+
 </body>
 
 </html>

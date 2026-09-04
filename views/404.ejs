@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= title %></title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+
+<body>
+  <%- include('_menu', { page: '404' }) %>
+
+  <main class="about">
+    <div class="about-content">
+      <h2>That Page Doesn't Exist</h2>
+      <p>
+        Nothing lives at <code><%= requestedPath %></code>. It may have moved, or the link
+        may be mistyped.
+      </p>
+      <div class="notfound-links">
+        <a href="/map" class="btn">Open the Map</a>
+        <a href="/favorites" class="btn secondary">Your Favourites</a>
+        <a href="/" class="btn secondary">Home</a>
+      </div>
+    </div>
+  </main>
+</body>
+
+</html>

@@ -1,1084 +1,268 @@
 {
   "rooms": [
     {
-      "label": "SW3-1602",
-      "building": "SW3",
-      "floor": "1",
-      "room": "1602",
-      "type": "room",
-      "source": "SW3-Floor1.geojson",
-      "query": "SW3-1602"
-    },
-    {
       "label": "SW3-1710",
       "building": "SW3",
       "floor": "1",
       "room": "1710",
+      "name": "Lecture Hall",
       "type": "room",
+      "confidence": null,
       "source": "SW3-Floor1.geojson",
-      "query": "SW3-1710"
+      "query": "SW3-1710 Lecture Hall"
     },
     {
       "label": "SW3-1750",
       "building": "SW3",
       "floor": "1",
       "room": "1750",
+      "name": "Lecture Hall",
       "type": "room",
+      "confidence": null,
       "source": "SW3-Floor1.geojson",
-      "query": "SW3-1750"
-    },
-    {
-      "label": "SW3-1605",
-      "building": "SW3",
-      "floor": "1",
-      "room": "1605",
-      "type": "room",
-      "source": "SW3-Floor1.geojson",
-      "query": "SW3-1605"
-    },
-    {
-      "label": "SW3-1615",
-      "building": "SW3",
-      "floor": "1",
-      "room": "1615",
-      "type": "room",
-      "source": "SW3-Floor1.geojson",
-      "query": "SW3-1615"
-    },
-    {
-      "label": "SW3-1625",
-      "building": "SW3",
-      "floor": "1",
-      "room": "1625",
-      "type": "room",
-      "source": "SW3-Floor1.geojson",
-      "query": "SW3-1625"
-    },
-    {
-      "label": "SW3-1635",
-      "building": "SW3",
-      "floor": "1",
-      "room": "1635",
-      "type": "room",
-      "source": "SW3-Floor1.geojson",
-      "query": "SW3-1635"
-    },
-    {
-      "label": "SW3-1655",
-      "building": "SW3",
-      "floor": "1",
-      "room": "1655",
-      "type": "room",
-      "source": "SW3-Floor1.geojson",
-      "query": "SW3-1655"
-    },
-    {
-      "label": "SW3-1695",
-      "building": "SW3",
-      "floor": "1",
-      "room": "1695",
-      "type": "room",
-      "source": "SW3-Floor1.geojson",
-      "query": "SW3-1695"
-    },
-    {
-      "label": "SW3-1640",
-      "building": "SW3",
-      "floor": "1",
-      "room": "1640",
-      "type": "room",
-      "source": "SW3-Floor1.geojson",
-      "query": "SW3-1640"
-    },
-    {
-      "label": "SW3-1650",
-      "building": "SW3",
-      "floor": "1",
-      "room": "1650",
-      "type": "room",
-      "source": "SW3-Floor1.geojson",
-      "query": "SW3-1650"
-    },
-    {
-      "label": "SW3-1660",
-      "building": "SW3",
-      "floor": "1",
-      "room": "1660",
-      "type": "room",
-      "source": "SW3-Floor1.geojson",
-      "query": "SW3-1660"
-    },
-    {
-      "label": "SW3-1658",
-      "building": "SW3",
-      "floor": "1",
-      "room": "1658",
-      "type": "room",
-      "source": "SW3-Floor1.geojson",
-      "query": "SW3-1658"
-    },
-    {
-      "label": "SW3-1654",
-      "building": "SW3",
-      "floor": "1",
-      "room": "1654",
-      "type": "room",
-      "source": "SW3-Floor1.geojson",
-      "query": "SW3-1654"
-    },
-    {
-      "label": "SW3-1656",
-      "building": "SW3",
-      "floor": "1",
-      "room": "1656",
-      "type": "room",
-      "source": "SW3-Floor1.geojson",
-      "query": "SW3-1656"
-    },
-    {
-      "label": "SW3-1690",
-      "building": "SW3",
-      "floor": "1",
-      "room": "1690",
-      "type": "room",
-      "source": "SW3-Floor1.geojson",
-      "query": "SW3-1690"
-    },
-    {
-      "label": "SW3-1696",
-      "building": "SW3",
-      "floor": "1",
-      "room": "1696",
-      "type": "room",
-      "source": "SW3-Floor1.geojson",
-      "query": "SW3-1696"
-    },
-    {
-      "label": "SW3-S160",
-      "building": "SW3",
-      "floor": "1",
-      "room": "S160",
-      "type": "room",
-      "source": "SW3-Floor1.geojson",
-      "query": "SW3-S160"
-    },
-    {
-      "label": "SW3-1730",
-      "building": "SW3",
-      "floor": "1",
-      "room": "1730",
-      "type": "room",
-      "source": "SW3-Floor1.geojson",
-      "query": "SW3-1730"
-    },
-    {
-      "label": "SW3-1915",
-      "building": "SW3",
-      "floor": "1",
-      "room": "1915",
-      "type": "room",
-      "source": "SW3-Floor1.geojson",
-      "query": "SW3-1915"
-    },
-    {
-      "label": "SW3-1945",
-      "building": "SW3",
-      "floor": "1",
-      "room": "1945",
-      "type": "room",
-      "source": "SW3-Floor1.geojson",
-      "query": "SW3-1945"
-    },
-    {
-      "label": "SW3-1965",
-      "building": "SW3",
-      "floor": "1",
-      "room": "1965",
-      "type": "room",
-      "source": "SW3-Floor1.geojson",
-      "query": "SW3-1965"
-    },
-    {
-      "label": "SW3-1955",
-      "building": "SW3",
-      "floor": "1",
-      "room": "1955",
-      "type": "room",
-      "source": "SW3-Floor1.geojson",
-      "query": "SW3-1955"
-    },
-    {
-      "label": "SW3-1975",
-      "building": "SW3",
-      "floor": "1",
-      "room": "1975",
-      "type": "room",
-      "source": "SW3-Floor1.geojson",
-      "query": "SW3-1975"
-    },
-    {
-      "label": "SW3-1920",
-      "building": "SW3",
-      "floor": "1",
-      "room": "1920",
-      "type": "room",
-      "source": "SW3-Floor1.geojson",
-      "query": "SW3-1920"
-    },
-    {
-      "label": "SW3-1610",
-      "building": "SW3",
-      "floor": "1",
-      "room": "1610",
-      "type": "room",
-      "source": "SW3-Floor1.geojson",
-      "query": "SW3-1610"
-    },
-    {
-      "label": "SW3-1620",
-      "building": "SW3",
-      "floor": "1",
-      "room": "1620",
-      "type": "room",
-      "source": "SW3-Floor1.geojson",
-      "query": "SW3-1620"
-    },
-    {
-      "label": "SW3-1985",
-      "building": "SW3",
-      "floor": "1",
-      "room": "1985",
-      "type": "room",
-      "source": "SW3-Floor1.geojson",
-      "query": "SW3-1985"
+      "query": "SW3-1750 Lecture Hall"
     },
     {
       "label": "SW3-1990",
       "building": "SW3",
       "floor": "1",
       "room": "1990",
+      "name": "Electrical Lab",
       "type": "room",
+      "confidence": null,
       "source": "SW3-Floor1.geojson",
-      "query": "SW3-1990"
+      "query": "SW3-1990 Electrical Lab"
+    },
+    {
+      "label": "SW3-1985",
+      "building": "SW3",
+      "floor": "1",
+      "room": "1985",
+      "name": "Electrical Lab",
+      "type": "room",
+      "confidence": null,
+      "source": "SW3-Floor1.geojson",
+      "query": "SW3-1985 Electrical Lab"
     },
     {
       "label": "SW3-1950",
       "building": "SW3",
       "floor": "1",
       "room": "1950",
+      "name": "Office",
       "type": "room",
+      "confidence": null,
       "source": "SW3-Floor1.geojson",
-      "query": "SW3-1950"
+      "query": "SW3-1950 Office"
     },
     {
-      "label": "SW3-S190",
+      "label": "SW3-1920",
       "building": "SW3",
       "floor": "1",
-      "room": "S190",
+      "room": "1920",
+      "name": "Drafting Lab",
       "type": "room",
+      "confidence": null,
       "source": "SW3-Floor1.geojson",
-      "query": "SW3-S190"
+      "query": "SW3-1920 Drafting Lab"
     },
     {
-      "label": "SW3-1924",
+      "label": "SW3-1975",
       "building": "SW3",
       "floor": "1",
-      "room": "1924",
+      "room": "1975",
+      "name": "Office",
       "type": "room",
+      "confidence": null,
       "source": "SW3-Floor1.geojson",
-      "query": "SW3-1924"
+      "query": "SW3-1975 Office"
+    },
+    {
+      "label": "SW3-1955",
+      "building": "SW3",
+      "floor": "1",
+      "room": "1955",
+      "name": "Office",
+      "type": "room",
+      "confidence": null,
+      "source": "SW3-Floor1.geojson",
+      "query": "SW3-1955 Office"
+    },
+    {
+      "label": "SW3-1915",
+      "building": "SW3",
+      "floor": "1",
+      "room": "1915",
+      "name": "Drafting Lab",
+      "type": "room",
+      "confidence": null,
+      "source": "SW3-Floor1.geojson",
+      "query": "SW3-1915 Drafting Lab"
     },
     {
       "label": "SW3-1910",
       "building": "SW3",
       "floor": "1",
       "room": "1910",
+      "name": "Communications",
       "type": "room",
+      "confidence": null,
       "source": "SW3-Floor1.geojson",
-      "query": "SW3-1910"
+      "query": "SW3-1910 Communications"
     },
     {
-      "label": "SW3-S180",
+      "label": "SW3-1610",
       "building": "SW3",
       "floor": "1",
-      "room": "S180",
+      "room": "1610",
+      "name": "Women's Washroom",
       "type": "room",
+      "confidence": null,
       "source": "SW3-Floor1.geojson",
-      "query": "SW3-S180"
+      "query": "SW3-1610 Women's Washroom"
     },
     {
-      "label": "SW3-1700",
+      "label": "SW3-1620",
       "building": "SW3",
       "floor": "1",
-      "room": "1700",
+      "room": "1620",
+      "name": "Men's Washroom",
       "type": "room",
+      "confidence": null,
       "source": "SW3-Floor1.geojson",
-      "query": "SW3-1700"
+      "query": "SW3-1620 Men's Washroom"
     },
     {
-      "label": "SW3-1604",
+      "label": "SW3-1612",
       "building": "SW3",
       "floor": "1",
-      "room": "1604",
+      "room": "1612",
+      "name": "Women's Washroom",
       "type": "room",
+      "confidence": null,
       "source": "SW3-Floor1.geojson",
-      "query": "SW3-1604"
+      "query": "SW3-1612 Women's Washroom"
     },
     {
-      "label": "SW3-S170",
+      "label": "SW3-1616",
       "building": "SW3",
       "floor": "1",
-      "room": "S170",
+      "room": "1616",
+      "name": "Women's Washroom",
       "type": "room",
+      "confidence": null,
       "source": "SW3-Floor1.geojson",
-      "query": "SW3-S170"
+      "query": "SW3-1616 Women's Washroom"
     },
     {
-      "label": "SW3-1642",
+      "label": "SW3-1622",
       "building": "SW3",
       "floor": "1",
-      "room": "1642",
+      "room": "1622",
+      "name": "Men's Washroom",
       "type": "room",
+      "confidence": null,
       "source": "SW3-Floor1.geojson",
-      "query": "SW3-1642"
+      "query": "SW3-1622 Men's Washroom"
     },
     {
-      "label": "SW3-2086",
+      "label": "SW3-1605",
       "building": "SW3",
-      "floor": "2",
-      "room": "2086",
-      "type": "room",
-      "source": "SW3-Floor2.geojson",
-      "query": "SW3-2086"
-    },
-    {
-      "label": "SW3-2655",
-      "building": "SW3",
-      "floor": "2",
-      "room": "2655",
-      "type": "room",
-      "source": "SW3-Floor2.geojson",
-      "query": "SW3-2655"
-    },
-    {
-      "label": "SW3-2684",
-      "building": "SW3",
-      "floor": "2",
-      "room": "2684",
-      "type": "room",
-      "source": "SW3-Floor2.geojson",
-      "query": "SW3-2684"
-    },
-    {
-      "label": "SW3-2905",
-      "building": "SW3",
-      "floor": "2",
-      "room": "2905",
-      "type": "room",
-      "source": "SW3-Floor2.geojson",
-      "query": "SW3-2905"
-    },
-    {
-      "label": "SW3-2925",
-      "building": "SW3",
-      "floor": "2",
-      "room": "2925",
-      "type": "room",
-      "source": "SW3-Floor2.geojson",
-      "query": "SW3-2925"
-    },
-    {
-      "label": "SW3-2915",
-      "building": "SW3",
-      "floor": "2",
-      "room": "2915",
-      "type": "room",
-      "source": "SW3-Floor2.geojson",
-      "query": "SW3-2915"
-    },
-    {
-      "label": "SW3-2910",
-      "building": "SW3",
-      "floor": "2",
-      "room": "2910",
-      "type": "room",
-      "source": "SW3-Floor2.geojson",
-      "query": "SW3-2910"
-    },
-    {
-      "label": "SW3-2955",
-      "building": "SW3",
-      "floor": "2",
-      "room": "2955",
-      "type": "room",
-      "source": "SW3-Floor2.geojson",
-      "query": "SW3-2955"
-    },
-    {
-      "label": "SW3-2980",
-      "building": "SW3",
-      "floor": "2",
-      "room": "2980",
-      "type": "room",
-      "source": "SW3-Floor2.geojson",
-      "query": "SW3-2980"
-    },
-    {
-      "label": "SW3-2700",
-      "building": "SW3",
-      "floor": "2",
-      "room": "2700",
-      "type": "room",
-      "source": "SW3-Floor2.geojson",
-      "query": "SW3-2700"
-    },
-    {
-      "label": "SW3-2600",
-      "building": "SW3",
-      "floor": "2",
-      "room": "2600",
-      "type": "room",
-      "source": "SW3-Floor2.geojson",
-      "query": "SW3-2600"
-    },
-    {
-      "label": "SW3-2900",
-      "building": "SW3",
-      "floor": "2",
-      "room": "2900",
-      "type": "room",
-      "source": "SW3-Floor2.geojson",
-      "query": "SW3-2900"
-    },
-    {
-      "label": "SW3-2063",
-      "building": "SW3",
-      "floor": "2",
-      "room": "2063",
-      "type": "room",
-      "source": "SW3-Floor2.geojson",
-      "query": "SW3-2063"
-    },
-    {
-      "label": "SW3-2065",
-      "building": "SW3",
-      "floor": "2",
-      "room": "2065",
-      "type": "room",
-      "source": "SW3-Floor2.geojson",
-      "query": "SW3-2065"
-    },
-    {
-      "label": "SW3-2069",
-      "building": "SW3",
-      "floor": "2",
-      "room": "2069",
-      "type": "room",
-      "source": "SW3-Floor2.geojson",
-      "query": "SW3-2069"
-    },
-    {
-      "label": "SW3-2075",
-      "building": "SW3",
-      "floor": "2",
-      "room": "2075",
-      "type": "room",
-      "source": "SW3-Floor2.geojson",
-      "query": "SW3-2075"
-    },
-    {
-      "label": "SW3-2079",
-      "building": "SW3",
-      "floor": "2",
-      "room": "2079",
-      "type": "room",
-      "source": "SW3-Floor2.geojson",
-      "query": "SW3-2079"
-    },
-    {
-      "label": "SW3-2090",
-      "building": "SW3",
-      "floor": "2",
-      "room": "2090",
-      "type": "room",
-      "source": "SW3-Floor2.geojson",
-      "query": "SW3-2090"
-    },
-    {
-      "label": "SW3-2080",
-      "building": "SW3",
-      "floor": "2",
-      "room": "2080",
-      "type": "room",
-      "source": "SW3-Floor2.geojson",
-      "query": "SW3-2080"
-    },
-    {
-      "label": "SW3-2081",
-      "building": "SW3",
-      "floor": "2",
-      "room": "2081",
-      "type": "room",
-      "source": "SW3-Floor2.geojson",
-      "query": "SW3-2081"
-    },
-    {
-      "label": "SW3-2082",
-      "building": "SW3",
-      "floor": "2",
-      "room": "2082",
-      "type": "room",
-      "source": "SW3-Floor2.geojson",
-      "query": "SW3-2082"
-    },
-    {
-      "label": "SW3-2083",
-      "building": "SW3",
-      "floor": "2",
-      "room": "2083",
-      "type": "room",
-      "source": "SW3-Floor2.geojson",
-      "query": "SW3-2083"
-    },
-    {
-      "label": "SW3-2085",
-      "building": "SW3",
-      "floor": "2",
-      "room": "2085",
-      "type": "room",
-      "source": "SW3-Floor2.geojson",
-      "query": "SW3-2085"
-    },
-    {
-      "label": "SW3-2084",
-      "building": "SW3",
-      "floor": "2",
-      "room": "2084",
-      "type": "room",
-      "source": "SW3-Floor2.geojson",
-      "query": "SW3-2084"
-    },
-    {
-      "label": "SW3-2087",
-      "building": "SW3",
-      "floor": "2",
-      "room": "2087",
-      "type": "room",
-      "source": "SW3-Floor2.geojson",
-      "query": "SW3-2087"
-    },
-    {
-      "label": "SW3-2088",
-      "building": "SW3",
-      "floor": "2",
-      "room": "2088",
-      "type": "room",
-      "source": "SW3-Floor2.geojson",
-      "query": "SW3-2088"
-    },
-    {
-      "label": "SW3-2089",
-      "building": "SW3",
-      "floor": "2",
-      "room": "2089",
-      "type": "room",
-      "source": "SW3-Floor2.geojson",
-      "query": "SW3-2089"
-    },
-    {
-      "label": "SW3-2091",
-      "building": "SW3",
-      "floor": "2",
-      "room": "2091",
-      "type": "room",
-      "source": "SW3-Floor2.geojson",
-      "query": "SW3-2091"
-    },
-    {
-      "label": "SW3-2600",
-      "building": "SW3",
-      "floor": "2",
-      "room": "2600",
-      "type": "room",
-      "source": "SW3-Floor2.geojson",
-      "query": "SW3-2600"
-    },
-    {
-      "label": "SW3-2605",
-      "building": "SW3",
-      "floor": "2",
-      "room": "2605",
-      "type": "room",
-      "source": "SW3-Floor2.geojson",
-      "query": "SW3-2605"
-    },
-    {
-      "label": "SW3-2625",
-      "building": "SW3",
-      "floor": "2",
-      "room": "2625",
-      "type": "room",
-      "source": "SW3-Floor2.geojson",
-      "query": "SW3-2625"
-    },
-    {
-      "label": "SW3-2635",
-      "building": "SW3",
-      "floor": "2",
-      "room": "2635",
-      "type": "room",
-      "source": "SW3-Floor2.geojson",
-      "query": "SW3-2635"
-    },
-    {
-      "label": "SW3-2639",
-      "building": "SW3",
-      "floor": "2",
-      "room": "2639",
-      "type": "room",
-      "source": "SW3-Floor2.geojson",
-      "query": "SW3-2639"
-    },
-    {
-      "label": "SW3-2656",
-      "building": "SW3",
-      "floor": "2",
-      "room": "2656",
-      "type": "room",
-      "source": "SW3-Floor2.geojson",
-      "query": "SW3-2656"
-    },
-    {
-      "label": "SW3-2665",
-      "building": "SW3",
-      "floor": "2",
-      "room": "2665",
-      "type": "room",
-      "source": "SW3-Floor2.geojson",
-      "query": "SW3-2665"
-    },
-    {
-      "label": "SW3-2675",
-      "building": "SW3",
-      "floor": "2",
-      "room": "2675",
-      "type": "room",
-      "source": "SW3-Floor2.geojson",
-      "query": "SW3-2675"
-    },
-    {
-      "label": "SW3-2695",
-      "building": "SW3",
-      "floor": "2",
-      "room": "2695",
-      "type": "room",
-      "source": "SW3-Floor2.geojson",
-      "query": "SW3-2695"
-    },
-    {
-      "label": "SW3-S260",
-      "building": "SW3",
-      "floor": "2",
-      "room": "S260",
-      "type": "stairs",
-      "source": "SW3-Floor2.geojson",
-      "query": "SW3-S260"
-    },
-    {
-      "label": "SW3-2696",
-      "building": "SW3",
-      "floor": "2",
-      "room": "2696",
-      "type": "room",
-      "source": "SW3-Floor2.geojson",
-      "query": "SW3-2696"
-    },
-    {
-      "label": "SW3-2690",
-      "building": "SW3",
-      "floor": "2",
-      "room": "2690",
-      "type": "room",
-      "source": "SW3-Floor2.geojson",
-      "query": "SW3-2690"
-    },
-    {
-      "label": "SW3-2680",
-      "building": "SW3",
-      "floor": "2",
-      "room": "2680",
-      "type": "room",
-      "source": "SW3-Floor2.geojson",
-      "query": "SW3-2680"
-    },
-    {
-      "label": "SW3-2660",
-      "building": "SW3",
-      "floor": "2",
-      "room": "2660",
-      "type": "room",
-      "source": "SW3-Floor2.geojson",
-      "query": "SW3-2660"
-    },
-    {
-      "label": "SW3-2640",
-      "building": "SW3",
-      "floor": "2",
-      "room": "2640",
-      "type": "room",
-      "source": "SW3-Floor2.geojson",
-      "query": "SW3-2640"
-    },
-    {
-      "label": "SW3-2644",
-      "building": "SW3",
-      "floor": "2",
-      "room": "2644",
-      "type": "room",
-      "source": "SW3-Floor2.geojson",
-      "query": "SW3-2644"
-    },
-    {
-      "label": "SW3-2626",
-      "building": "SW3",
-      "floor": "2",
-      "room": "2626",
-      "type": "room",
-      "source": "SW3-Floor2.geojson",
-      "query": "SW3-2626"
-    },
-    {
-      "label": "SW3-2624",
-      "building": "SW3",
-      "floor": "2",
-      "room": "2624",
-      "type": "room",
-      "source": "SW3-Floor2.geojson",
-      "query": "SW3-2624"
-    },
-    {
-      "label": "SW3-2620",
-      "building": "SW3",
-      "floor": "2",
-      "room": "2620",
-      "type": "room",
-      "source": "SW3-Floor2.geojson",
-      "query": "SW3-2620"
-    },
-    {
-      "label": "SW3-2630",
-      "building": "SW3",
-      "floor": "2",
-      "room": "2630",
-      "type": "room",
-      "source": "SW3-Floor2.geojson",
-      "query": "SW3-2630"
-    },
-    {
-      "label": "SW3-2618",
-      "building": "SW3",
-      "floor": "2",
-      "room": "2618",
-      "type": "room",
-      "source": "SW3-Floor2.geojson",
-      "query": "SW3-2618"
-    },
-    {
-      "label": "SW3-S270",
-      "building": "SW3",
-      "floor": "2",
-      "room": "S270",
-      "type": "stairs",
-      "source": "SW3-Floor2.geojson",
-      "query": "SW3-S270"
-    },
-    {
-      "label": "SW3-2704",
-      "building": "SW3",
-      "floor": "2",
-      "room": "2704",
-      "type": "room",
-      "source": "SW3-Floor2.geojson",
-      "query": "SW3-2704"
-    },
-    {
-      "label": "SW3-2710",
-      "building": "SW3",
-      "floor": "2",
-      "room": "2710",
-      "type": "room",
-      "source": "SW3-Floor2.geojson",
-      "query": "SW3-2710"
-    },
-    {
-      "label": "SW3-2730",
-      "building": "SW3",
-      "floor": "2",
-      "room": "2730",
-      "type": "room",
-      "source": "SW3-Floor2.geojson",
-      "query": "SW3-2730"
-    },
-    {
-      "label": "SW3-2750",
-      "building": "SW3",
-      "floor": "2",
-      "room": "2750",
-      "type": "room",
-      "source": "SW3-Floor2.geojson",
-      "query": "SW3-2750"
-    },
-    {
-      "label": "SW3-2770",
-      "building": "SW3",
-      "floor": "2",
-      "room": "2770",
-      "type": "room",
-      "source": "SW3-Floor2.geojson",
-      "query": "SW3-2770"
-    },
-    {
-      "label": "SW3-S280",
-      "building": "SW3",
-      "floor": "2",
-      "room": "S280",
-      "type": "stairs",
-      "source": "SW3-Floor2.geojson",
-      "query": "SW3-S280"
-    },
-    {
-      "label": "SW3-2795",
-      "building": "SW3",
-      "floor": "2",
-      "room": "2795",
-      "type": "room",
-      "source": "SW3-Floor2.geojson",
-      "query": "SW3-2795"
-    },
-    {
-      "label": "SW3-2785",
-      "building": "SW3",
-      "floor": "2",
-      "room": "2785",
-      "type": "room",
-      "source": "SW3-Floor2.geojson",
-      "query": "SW3-2785"
-    },
-    {
-      "label": "SW3-2775",
-      "building": "SW3",
-      "floor": "2",
-      "room": "2775",
-      "type": "room",
-      "source": "SW3-Floor2.geojson",
-      "query": "SW3-2775"
-    },
-    {
-      "label": "SW3-2765",
-      "building": "SW3",
-      "floor": "2",
-      "room": "2765",
-      "type": "room",
-      "source": "SW3-Floor2.geojson",
-      "query": "SW3-2765"
-    },
-    {
-      "label": "SW3-2745",
-      "building": "SW3",
-      "floor": "2",
-      "room": "2745",
-      "type": "room",
-      "source": "SW3-Floor2.geojson",
-      "query": "SW3-2745"
-    },
-    {
-      "label": "SW3-2725",
-      "building": "SW3",
-      "floor": "2",
-      "room": "2725",
-      "type": "room",
-      "source": "SW3-Floor2.geojson",
-      "query": "SW3-2725"
-    },
-    {
-      "label": "SW3-2715",
-      "building": "SW3",
-      "floor": "2",
-      "room": "2715",
-      "type": "room",
-      "source": "SW3-Floor2.geojson",
-      "query": "SW3-2715"
-    },
-    {
-      "label": "SW3-2930",
-      "building": "SW3",
-      "floor": "2",
-      "room": "2930",
-      "type": "room",
-      "source": "SW3-Floor2.geojson",
-      "query": "SW3-2930"
-    },
-    {
-      "label": "SW3-S299",
-      "building": "SW3",
-      "floor": "2",
-      "room": "S299",
-      "type": "stairs",
-      "source": "SW3-Floor2.geojson",
-      "query": "SW3-S299"
-    },
-    {
-      "label": "SW5-1845",
-      "building": "SW5",
       "floor": "1",
-      "room": "1845",
+      "room": "1605",
+      "name": "Office",
       "type": "room",
-      "source": "SW5-Floor1.geojson",
-      "query": "SW5-1845"
+      "confidence": null,
+      "source": "SW3-Floor1.geojson",
+      "query": "SW3-1605 Office"
     },
     {
-      "label": "SW5-1855",
-      "building": "SW5",
+      "label": "SW3-1615",
+      "building": "SW3",
       "floor": "1",
-      "room": "1855",
+      "room": "1615",
+      "name": "Office",
       "type": "room",
-      "source": "SW5-Floor1.geojson",
-      "query": "SW5-1855"
+      "confidence": null,
+      "source": "SW3-Floor1.geojson",
+      "query": "SW3-1615 Office"
     },
     {
-      "label": "SW5-1850",
-      "building": "SW5",
+      "label": "SW3-1625",
+      "building": "SW3",
       "floor": "1",
-      "room": "1850",
+      "room": "1625",
+      "name": "Computer Lab",
       "type": "room",
-      "source": "SW5-Floor1.geojson",
-      "query": "SW5-1850"
+      "confidence": null,
+      "source": "SW3-Floor1.geojson",
+      "query": "SW3-1625 Computer Lab"
     },
     {
-      "label": "SW5-1840",
-      "building": "SW5",
+      "label": "SW3-1635",
+      "building": "SW3",
       "floor": "1",
-      "room": "1840",
+      "room": "1635",
+      "name": "Computer Lab",
       "type": "room",
-      "source": "SW5-Floor1.geojson",
-      "query": "SW5-1840"
+      "confidence": null,
+      "source": "SW3-Floor1.geojson",
+      "query": "SW3-1635 Computer Lab"
     },
     {
-      "label": "SW5-1800",
-      "building": "SW5",
+      "label": "SW3-1655",
+      "building": "SW3",
       "floor": "1",
-      "room": "1800",
+      "room": "1655",
+      "name": "Physical Sciences Laboratory",
       "type": "room",
-      "source": "SW5-Floor1.geojson",
-      "query": "SW5-1800"
+      "confidence": null,
+      "source": "SW3-Floor1.geojson",
+      "query": "SW3-1655 Physical Sciences Laboratory"
     },
     {
-      "label": "SW5-S189",
-      "building": "SW5",
+      "label": "SW3-1695",
+      "building": "SW3",
       "floor": "1",
-      "room": "S189",
-      "type": "stairs",
-      "source": "SW5-Floor1.geojson",
-      "query": "SW5-S189"
+      "room": "1695",
+      "name": "Electrical Lab",
+      "type": "room",
+      "confidence": null,
+      "source": "SW3-Floor1.geojson",
+      "query": "SW3-1695 Electrical Lab"
     },
     {
-      "label": "SW5-S180",
-      "building": "SW5",
+      "label": "SW3-1640",
+      "building": "SW3",
       "floor": "1",
-      "room": "S180",
-      "type": "stairs",
-      "source": "SW5-Floor1.geojson",
-      "query": "SW5-S180"
-    },
-    {
-      "label": "SW5-2875",
-      "building": "SW5",
-      "floor": "2",
-      "room": "2875",
+      "room": "1640",
+      "name": "Classroom",
       "type": "room",
-      "source": "SW5-Floor2.geojson",
-      "query": "SW5-2875"
+      "confidence": null,
+      "source": "SW3-Floor1.geojson",
+      "query": "SW3-1640 Classroom"
     },
     {
-      "label": "SW5-2895",
-      "building": "SW5",
-      "floor": "2",
-      "room": "2895",
+      "label": "SW3-1650",
+      "building": "SW3",
+      "floor": "1",
+      "room": "1650",
+      "name": "Physical Sciences Laboratory",
       "type": "room",
-      "source": "SW5-Floor2.geojson",
-      "query": "SW5-2895"
+      "confidence": null,
+      "source": "SW3-Floor1.geojson",
+      "query": "SW3-1650 Physical Sciences Laboratory"
     },
     {
-      "label": "SW5-2825",
-      "building": "SW5",
-      "floor": "2",
-      "room": "2825",
+      "label": "SW3-1690",
+      "building": "SW3",
+      "floor": "1",
+      "room": "1690",
+      "name": "Life Sciences Lab",
       "type": "room",
-      "source": "SW5-Floor2.geojson",
-      "query": "SW5-2825"
-    },
-    {
-      "label": "SW5-2800",
-      "building": "SW5",
-      "floor": "2",
-      "room": "2800",
-      "type": "room",
-      "source": "SW5-Floor2.geojson",
-      "query": "SW5-2800"
-    },
-    {
-      "label": "SW5-2890",
-      "building": "SW5",
-      "floor": "2",
-      "room": "2890",
-      "type": "room",
-      "source": "SW5-Floor2.geojson",
-      "query": "SW5-2890"
-    },
-    {
-      "label": "SW5-2810",
-      "building": "SW5",
-      "floor": "2",
-      "room": "2810",
-      "type": "room",
-      "source": "SW5-Floor2.geojson",
-      "query": "SW5-2810"
-    },
-    {
-      "label": "SW5-2880",
-      "building": "SW5",
-      "floor": "2",
-      "room": "2880",
-      "type": "room",
-      "source": "SW5-Floor2.geojson",
-      "query": "SW5-2880"
-    },
-    {
-      "label": "SW5-2820",
-      "building": "SW5",
-      "floor": "2",
-      "room": "2820",
-      "type": "room",
-      "source": "SW5-Floor2.geojson",
-      "query": "SW5-2820"
-    },
-    {
-      "label": "SW5-S280",
-      "building": "SW5",
-      "floor": "2",
-      "room": "S280",
-      "type": "room",
-      "source": "SW5-Floor2.geojson",
-      "query": "SW5-S280"
-    },
-    {
-      "label": "SW5-S289",
-      "building": "SW5",
-      "floor": "2",
-      "room": "S289",
-      "type": "stairs",
-      "source": "SW5-Floor2.geojson",
-      "query": "SW5-S289"
+      "confidence": null,
+      "source": "SW3-Floor1.geojson",
+      "query": "SW3-1690 Life Sciences Lab"
     }
   ]
 }

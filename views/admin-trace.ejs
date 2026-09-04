@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title><%= title %></title>
+  <meta name="mapbox-token" content="<%- MAPBOX_TOKEN %>">
+  <link rel="stylesheet" href="/css/style.css">
+  <link href="/vendor/mapbox-gl/mapbox-gl.css" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/admin-trace.css" />
+</head>
+
+<body class="tracer-body">
+  <%- include('_menu', { page: 'admin', user: user }) %>
+
+  <div class="tracer-shell">
+    <aside class="tracer-panel">
+      <section class="tracer-block">
+        <h3>Floor Plan</h3>
+        <select id="planPicker" aria-label="Floor plan"></select>
+        <p class="tracer-hint" id="planStatus">Pick a floor to start.</p>
+      </section>
+
+      <section class="tracer-block" id="placeBlock" hidden>
+        <h3>The Plan</h3>
+        <p class="tracer-hint">
+          Trace the whole floor first — everything you draw sticks to the
+          drawing. Then use <em>Move / Rotate Plan</em> to line the finished
+          floor up with the building, and it all moves together.
+        </p>
+        <p class="tracer-hint" id="adjustHint" hidden>
+          Drag the blue handle to move, the orange corner to resize, and the
+          green stalk to rotate. Each does one thing only.
+        </p>
+        <label class="tracer-field">
+          <span>Plan Transparency <output id="opacityOut">65%</output></span>
+          <input type="range" id="opacity" min="0" max="100" value="65"
+                 aria-label="Plan transparency">
+        </label>
+        <div class="tracer-row">
+          <button type="button" id="togglePlan">Hide Plan</button>
+          <span class="tracer-saved">or hold H to peek</span>
+        </div>
+        <div class="tracer-row">
+          <button type="button" id="fitBuilding">Fit to Building</button>
+          <button type="button" id="zoomPlan">Zoom to Plan</button>
+        </div>
+
+        <div class="tracer-adjust">
+          <div class="tracer-adjust-row">
+            <span class="tracer-adjust-label">Position</span>
+            <div class="tracer-pad">
+              <button type="button" id="nudgeUp" title="Move north">↑</button>
+              <button type="button" id="nudgeLeft" title="Move west">←</button>
+              <button type="button" id="nudgeRight" title="Move east">→</button>
+              <button type="button" id="nudgeDown" title="Move south">↓</button>
+            </div>
+            <label class="tracer-step">
+              Step
+              <select id="nudgeStep">
+                <option value="0.1">0.1 m</option>
+                <option value="0.5">0.5 m</option>
+                <option value="1" selected>1 m</option>
+                <option value="5">5 m</option>
+                <option value="20">20 m</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="tracer-adjust-row">
+            <span class="tracer-adjust-label">Width</span>
+            <button type="button" id="scaleDown" title="Smaller">−</button>
+            <input type="number" id="planWidth" step="0.1" min="1" aria-label="Plan width in metres">
+            <span class="tracer-unit">m</span>
+            <button type="button" id="scaleUp" title="Bigger">+</button>
+          </div>
+
+          <div class="tracer-adjust-row">
+            <span class="tracer-adjust-label">Rotation</span>
+            <button type="button" id="rotLeft" title="Rotate anticlockwise 1°">⟲</button>
+            <input type="number" id="planRotation" step="0.1" aria-label="Plan rotation in degrees">
+            <span class="tracer-unit">°</span>
+            <button type="button" id="rotRight" title="Rotate clockwise 1°">⟳</button>
+            <button type="button" id="rotQuarter" title="Turn a quarter">90°</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="tracer-block" id="drawBlock" hidden>
+        <!-- Two jobs, kept apart: drawing what the floor IS, and drawing how
+             you WALK through it. Each has its own tools and its own list, and
+             whichever you are not working on fades into the background. -->
+        <div class="tracer-modes" role="tablist">
+          <button type="button" id="modePlan" class="is-active" role="tab">Floor Plan</button>
+          <button type="button" id="modeNetwork" role="tab">Walking Network</button>
+        </div>
+
+        <h3 id="tracedHeading">Traced <span class="tracer-count" id="roomCount">0</span></h3>
+
+        <label class="tracer-field" id="planTypeField">
+          <span>What Are You Drawing</span>
+          <select id="drawType">
+<!-- What a space is called goes in its name -- "Women's Washroom", "AV
+                 Room". The type is only what the app does with it: send people
+                 to it, draw it, or connect floors through it. -->
+            <optgroup label="Outlines">
+              <option value="building">Building Outline</option>
+              <option value="room" selected>Room</option>
+              <option value="hallway">Hallway</option>
+              <option value="stairs">Stairs</option>
+              <option value="elevator">Elevator</option>
+              <option value="service">Service</option>
+            </optgroup>
+            <optgroup label="Navigation Markers">
+              <option value="door">Door</option>
+              <option value="entrance">Building Entrance</option>
+            </optgroup>
+          </select>
+        </label>
+
+        <div class="tracer-row" id="netTools" hidden>
+          <button type="button" id="autoName">Auto-name Nodes</button>
+          <button type="button" id="tidyLinks">Remove Duplicate Links</button>
+        </div>
+        <p class="tracer-hint" id="netToolsResult" hidden></p>
+
+        <label class="tracer-field" id="netTypeField" hidden>
+          <span>What Are You Drawing</span>
+          <select id="netType">
+            <option value="node" selected>Place Nodes</option>
+            <option value="link">Link Two Nodes</option>
+          </select>
+        </label>
+        <div class="tracer-row">
+          <button type="button" id="startDraw" class="tracer-primary">Draw</button>
+          <button type="button" id="adjustToggle">Move / Rotate Plan</button>
+        </div>
+        <div class="tracer-row" id="draftControls" hidden>
+          <button type="button" id="finishDraw" class="tracer-primary">Finish Room</button>
+          <button type="button" id="undoPoint">Undo Corner</button>
+          <button type="button" id="cancelDraw">Cancel</button>
+        </div>
+        <p class="tracer-hint" id="drawHint">
+          Click each corner, then Finish. Double-click also closes it;
+          Backspace undoes a corner and Esc cancels.
+        </p>
+        <ul class="tracer-rooms" id="roomList"></ul>
+        <div class="tracer-row">
+          <button type="button" id="saveFloor" class="tracer-primary">Save Floor</button>
+          <span class="tracer-saved" id="saveState"></span>
+        </div>
+      </section>
+
+      <section class="tracer-block">
+        <h3>Publish</h3>
+        <p class="tracer-hint">
+          Saving writes the floor. Search and routing read files built from it,
+          so rebuild when you want what you have traced to be findable and
+          routable in the app.
+        </p>
+        <div class="tracer-row">
+          <button type="button" id="rebuild">Rebuild Search &amp; Routing</button>
+          <span class="tracer-saved" id="rebuildState"></span>
+        </div>
+      </section>
+    </aside>
+
+    <div id="map" class="tracer-map"></div>
+  </div>
+
+  <!-- Details for a room just drawn, or one picked from the list -->
+  <div class="tracer-dialog" id="roomDialog" hidden>
+    <form id="roomForm">
+      <h4 id="roomDialogTitle">Room Details</h4>
+      <label class="tracer-field" id="roomField">
+        <span id="roomFieldLabel">Room Number</span>
+        <input type="text" name="room" placeholder="1600" autocomplete="off">
+      </label>
+      <label class="tracer-field" id="typeField">
+        <span>Type</span>
+        <select name="type">
+          <option value="building">Building Outline</option>
+          <option value="room">Room</option>
+          <option value="hallway">Hallway</option>
+          <option value="stairs">Stairs</option>
+          <option value="elevator">Elevator</option>
+          <option value="service">Service</option>
+          <option value="door">Door</option>
+          <option value="entrance">Building Entrance</option>
+          <option value="node">Path Node</option>
+        </select>
+      </label>
+      <label class="tracer-field" id="nameField">
+        <span>Name <small>(optional)</small></span>
+        <input type="text" name="name" placeholder="Lecture theatre" autocomplete="off">
+      </label>
+
+      <!-- What a room OFFERS, as opposed to what it is for routing. A
+           washroom is an ordinary room you can be sent to; the amenity is
+           what makes it worth marking on the map with a symbol, and what a
+           "nearest washroom" search would look for. -->
+      <label class="tracer-field" id="amenityField">
+        <span>Amenity <small>(optional)</small></span>
+        <select name="amenity">
+          <option value="">None</option>
+          <option value="washroom">Washroom</option>
+        </select>
+      </label>
+
+      <!-- Markers only: what this doorway or entrance joins. Filled in from
+           whatever has already been traced on this floor. -->
+      <div id="connectsFields" hidden>
+        <label class="tracer-field">
+          <span id="connectALabel">Connects</span>
+          <select name="connectA" id="connectA"></select>
+        </label>
+        <label class="tracer-field" id="connectBField">
+          <span>To</span>
+          <select name="connectB" id="connectB"></select>
+        </label>
+      </div>
+      <div class="tracer-row">
+        <button type="submit" class="tracer-primary">Save Room</button>
+        <button type="button" id="deleteRoom" class="tracer-danger">Delete</button>
+        <button type="button" id="cancelRoom">Cancel</button>
+      </div>
+    </form>
+  </div>
+
+  <script defer src="/vendor/mapbox-gl/mapbox-gl.js"></script>
+  <script defer type="module" src="/js/admin-trace.js"></script>
+</body>
+
+</html>

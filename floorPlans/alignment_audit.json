@@ -1,0 +1,29 @@
+{
+  "floors": [
+    {
+      "floor": "SW3-Floor3",
+      "pct_area_outside": 13.45,
+      "rooms_mostly_outside": 12,
+      "polygons": 51
+    },
+    {
+      "floor": "SW3-Floor1",
+      "pct_area_outside": 2.92,
+      "rooms_mostly_outside": 0,
+      "polygons": 42
+    },
+    {
+      "floor": "SW3-Floor2",
+      "pct_area_outside": 1.07,
+      "rooms_mostly_outside": 6,
+      "polygons": 82
+    },
+    {
+      "floor": "SW3-Floor4",
+      "pct_area_outside": 0.05,
+      "rooms_mostly_outside": 0,
+      "polygons": 61
+    }
+  ],
+  "no_footprint": []
+}

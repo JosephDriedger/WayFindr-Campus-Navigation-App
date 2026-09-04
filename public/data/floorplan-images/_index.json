@@ -1,0 +1,625 @@
+{
+  "CARI-Floor1": {
+    "building": "CARI",
+    "floor": "1",
+    "height": 2241,
+    "image": "/data/floorplan-images/CARI-Floor1.png",
+    "width": 3536
+  },
+  "CARI-Floor2": {
+    "building": "CARI",
+    "floor": "2",
+    "height": 2240,
+    "image": "/data/floorplan-images/CARI-Floor2.png",
+    "width": 3537
+  },
+  "NE1-Floor1": {
+    "building": "NE1",
+    "floor": "1",
+    "height": 3613,
+    "image": "/data/floorplan-images/NE1-Floor1.png",
+    "width": 2317
+  },
+  "NE1-Floor2": {
+    "building": "NE1",
+    "floor": "2",
+    "height": 3614,
+    "image": "/data/floorplan-images/NE1-Floor2.png",
+    "width": 2318
+  },
+  "NE1-Floor3": {
+    "building": "NE1",
+    "floor": "3",
+    "height": 3614,
+    "image": "/data/floorplan-images/NE1-Floor3.png",
+    "width": 2318
+  },
+  "NE1-Floor4": {
+    "building": "NE1",
+    "floor": "4",
+    "height": 3618,
+    "image": "/data/floorplan-images/NE1-Floor4.png",
+    "width": 2322
+  },
+  "NE10-Floor1": {
+    "building": "NE10",
+    "floor": "1",
+    "height": 2188,
+    "image": "/data/floorplan-images/NE10-Floor1.png",
+    "width": 3429
+  },
+  "NE12-Floor1": {
+    "building": "NE12",
+    "floor": "1",
+    "height": 2188,
+    "image": "/data/floorplan-images/NE12-Floor1.png",
+    "width": 3429
+  },
+  "NE12-Floor2": {
+    "building": "NE12",
+    "floor": "2",
+    "height": 2376,
+    "image": "/data/floorplan-images/NE12-Floor2.png",
+    "width": 3672
+  },
+  "NE16-Floor1": {
+    "building": "NE16",
+    "floor": "1",
+    "height": 3429,
+    "image": "/data/floorplan-images/NE16-Floor1.png",
+    "width": 2187
+  },
+  "NE18-Floor1": {
+    "building": "NE18",
+    "floor": "1",
+    "height": 2190,
+    "image": "/data/floorplan-images/NE18-Floor1.png",
+    "width": 3432
+  },
+  "NE2-Floor1": {
+    "building": "NE2",
+    "floor": "1",
+    "height": 2298,
+    "image": "/data/floorplan-images/NE2-Floor1.png",
+    "width": 3541
+  },
+  "NE2-Floor2": {
+    "building": "NE2",
+    "floor": "2",
+    "height": 2296,
+    "image": "/data/floorplan-images/NE2-Floor2.png",
+    "width": 3538
+  },
+  "NE20-Floor1": {
+    "building": "NE20",
+    "floor": "1",
+    "height": 2294,
+    "image": "/data/floorplan-images/NE20-Floor1.png",
+    "width": 3537
+  },
+  "NE20-Floor2": {
+    "building": "NE20",
+    "floor": "2",
+    "height": 2190,
+    "image": "/data/floorplan-images/NE20-Floor2.png",
+    "width": 3432
+  },
+  "NE22-Floor1": {
+    "building": "NE22",
+    "floor": "1",
+    "height": 3537,
+    "image": "/data/floorplan-images/NE22-Floor1.png",
+    "width": 2241
+  },
+  "NE23-Floor1": {
+    "building": "NE23",
+    "floor": "1",
+    "height": 2188,
+    "image": "/data/floorplan-images/NE23-Floor1.png",
+    "width": 3430
+  },
+  "NE24-Floor1": {
+    "building": "NE24",
+    "floor": "1",
+    "height": 2190,
+    "image": "/data/floorplan-images/NE24-Floor1.png",
+    "width": 3432
+  },
+  "NE25-Floor1": {
+    "building": "NE25",
+    "floor": "1",
+    "height": 2296,
+    "image": "/data/floorplan-images/NE25-Floor1.png",
+    "width": 3538
+  },
+  "NE25-Floor2": {
+    "building": "NE25",
+    "floor": "2",
+    "height": 2298,
+    "image": "/data/floorplan-images/NE25-Floor2.png",
+    "width": 3541
+  },
+  "NE25-Floor3": {
+    "building": "NE25",
+    "floor": "3",
+    "height": 2295,
+    "image": "/data/floorplan-images/NE25-Floor3.png",
+    "width": 3537
+  },
+  "NE28-Floor1": {
+    "building": "NE28",
+    "floor": "1",
+    "height": 3427,
+    "image": "/data/floorplan-images/NE28-Floor1.png",
+    "width": 2185
+  },
+  "NE3-Floor1": {
+    "building": "NE3",
+    "floor": "1",
+    "height": 2295,
+    "image": "/data/floorplan-images/NE3-Floor1.png",
+    "width": 3537
+  },
+  "NE3-Floor2": {
+    "building": "NE3",
+    "floor": "2",
+    "height": 2190,
+    "image": "/data/floorplan-images/NE3-Floor2.png",
+    "width": 3432
+  },
+  "NE4-Floor1": {
+    "building": "NE4",
+    "floor": "1",
+    "height": 2296,
+    "image": "/data/floorplan-images/NE4-Floor1.png",
+    "width": 3537
+  },
+  "NE4-Floor2": {
+    "building": "NE4",
+    "floor": "2",
+    "height": 2296,
+    "image": "/data/floorplan-images/NE4-Floor2.png",
+    "width": 3538
+  },
+  "NE6-Floor1": {
+    "building": "NE6",
+    "floor": "1",
+    "height": 2296,
+    "image": "/data/floorplan-images/NE6-Floor1.png",
+    "width": 3537
+  },
+  "NE6-Floor2": {
+    "building": "NE6",
+    "floor": "2",
+    "height": 2296,
+    "image": "/data/floorplan-images/NE6-Floor2.png",
+    "width": 3537
+  },
+  "NE7-Floor1": {
+    "building": "NE7",
+    "floor": "1",
+    "height": 3430,
+    "image": "/data/floorplan-images/NE7-Floor1.png",
+    "width": 2187
+  },
+  "NE8-Floor1": {
+    "building": "NE8",
+    "floor": "1",
+    "height": 2188,
+    "image": "/data/floorplan-images/NE8-Floor1.png",
+    "width": 3429
+  },
+  "NE8-Floor2": {
+    "building": "NE8",
+    "floor": "2",
+    "height": 2190,
+    "image": "/data/floorplan-images/NE8-Floor2.png",
+    "width": 3432
+  },
+  "NE9-Floor1": {
+    "building": "NE9",
+    "floor": "1",
+    "height": 2188,
+    "image": "/data/floorplan-images/NE9-Floor1.png",
+    "width": 3430
+  },
+  "NE9-Floor2": {
+    "building": "NE9",
+    "floor": "2",
+    "height": 2188,
+    "image": "/data/floorplan-images/NE9-Floor2.png",
+    "width": 3430
+  },
+  "NW1-Floor1": {
+    "building": "NW1",
+    "floor": "1",
+    "height": 2298,
+    "image": "/data/floorplan-images/NW1-Floor1.png",
+    "width": 3541
+  },
+  "NW3-Floor1": {
+    "building": "NW3",
+    "floor": "1",
+    "height": 3618,
+    "image": "/data/floorplan-images/NW3-Floor1.png",
+    "width": 2322
+  },
+  "NW3-Floor2": {
+    "building": "NW3",
+    "floor": "2",
+    "height": 2189,
+    "image": "/data/floorplan-images/NW3-Floor2.png",
+    "width": 3431
+  },
+  "NW4-Floor1": {
+    "building": "NW4",
+    "floor": "1",
+    "height": 3672,
+    "image": "/data/floorplan-images/NW4-Floor1.png",
+    "width": 2376
+  },
+  "NW4-Floor2": {
+    "building": "NW4",
+    "floor": "2",
+    "height": 3672,
+    "image": "/data/floorplan-images/NW4-Floor2.png",
+    "width": 2376
+  },
+  "NW4-Floor3": {
+    "building": "NW4",
+    "floor": "3",
+    "height": 3612,
+    "image": "/data/floorplan-images/NW4-Floor3.png",
+    "width": 2316
+  },
+  "NW4-Floor4": {
+    "building": "NW4",
+    "floor": "4",
+    "height": 3612,
+    "image": "/data/floorplan-images/NW4-Floor4.png",
+    "width": 2316
+  },
+  "NW5-Floor1": {
+    "building": "NW5",
+    "floor": "1",
+    "height": 2190,
+    "image": "/data/floorplan-images/NW5-Floor1.png",
+    "width": 3433
+  },
+  "NW5-Floor2": {
+    "building": "NW5",
+    "floor": "2",
+    "height": 2190,
+    "image": "/data/floorplan-images/NW5-Floor2.png",
+    "width": 3433
+  },
+  "NW6-Floor1": {
+    "building": "NW6",
+    "floor": "1",
+    "height": 2190,
+    "image": "/data/floorplan-images/NW6-Floor1.png",
+    "width": 3433
+  },
+  "NW6-Floor2": {
+    "building": "NW6",
+    "floor": "2",
+    "height": 2190,
+    "image": "/data/floorplan-images/NW6-Floor2.png",
+    "width": 3433
+  },
+  "SE1-Floor1": {
+    "building": "SE1",
+    "floor": "1",
+    "height": 2318,
+    "image": "/data/floorplan-images/SE1-Floor1.png",
+    "width": 3614
+  },
+  "SE1-Floor2": {
+    "building": "SE1",
+    "floor": "2",
+    "height": 2349,
+    "image": "/data/floorplan-images/SE1-Floor2.png",
+    "width": 3615
+  },
+  "SE10-Floor1": {
+    "building": "SE10",
+    "floor": "1",
+    "height": 3429,
+    "image": "/data/floorplan-images/SE10-Floor1.png",
+    "width": 2187
+  },
+  "SE10-Floor2": {
+    "building": "SE10",
+    "floor": "2",
+    "height": 3432,
+    "image": "/data/floorplan-images/SE10-Floor2.png",
+    "width": 2190
+  },
+  "SE12-Floor1": {
+    "building": "SE12",
+    "floor": "1",
+    "height": 3430,
+    "image": "/data/floorplan-images/SE12-Floor1.png",
+    "width": 2188
+  },
+  "SE12-Floor2": {
+    "building": "SE12",
+    "floor": "2",
+    "height": 2295,
+    "image": "/data/floorplan-images/SE12-Floor2.png",
+    "width": 3537
+  },
+  "SE12-Floor3": {
+    "building": "SE12",
+    "floor": "3",
+    "height": 2188,
+    "image": "/data/floorplan-images/SE12-Floor3.png",
+    "width": 3430
+  },
+  "SE12-Floor4": {
+    "building": "SE12",
+    "floor": "4",
+    "height": 2295,
+    "image": "/data/floorplan-images/SE12-Floor4.png",
+    "width": 3537
+  },
+  "SE14-Floor1": {
+    "building": "SE14",
+    "floor": "1",
+    "height": 2347,
+    "image": "/data/floorplan-images/SE14-Floor1.png",
+    "width": 3642
+  },
+  "SE14-Floor2": {
+    "building": "SE14",
+    "floor": "2",
+    "height": 2296,
+    "image": "/data/floorplan-images/SE14-Floor2.png",
+    "width": 3537
+  },
+  "SE14-Floor3": {
+    "building": "SE14",
+    "floor": "3",
+    "height": 2296,
+    "image": "/data/floorplan-images/SE14-Floor3.png",
+    "width": 3537
+  },
+  "SE16-Floor1": {
+    "building": "SE16",
+    "floor": "1",
+    "height": 3496,
+    "image": "/data/floorplan-images/SE16-Floor1.png",
+    "width": 2245
+  },
+  "SE2-Floor1": {
+    "building": "SE2",
+    "floor": "1",
+    "height": 2294,
+    "image": "/data/floorplan-images/SE2-Floor1.png",
+    "width": 3536
+  },
+  "SE2-Floor2": {
+    "building": "SE2",
+    "floor": "2",
+    "height": 2295,
+    "image": "/data/floorplan-images/SE2-Floor2.png",
+    "width": 3537
+  },
+  "SE2-Floor3": {
+    "building": "SE2",
+    "floor": "3",
+    "height": 2294,
+    "image": "/data/floorplan-images/SE2-Floor3.png",
+    "width": 3536
+  },
+  "SE30-Floor1": {
+    "building": "SE30",
+    "floor": "1",
+    "height": 2189,
+    "image": "/data/floorplan-images/SE30-Floor1.png",
+    "width": 3431
+  },
+  "SE4-Floor1": {
+    "building": "SE4",
+    "floor": "1",
+    "height": 2188,
+    "image": "/data/floorplan-images/SE4-Floor1.png",
+    "width": 3430
+  },
+  "SE40-Floor1": {
+    "building": "SE40",
+    "floor": "1",
+    "height": 2296,
+    "image": "/data/floorplan-images/SE40-Floor1.png",
+    "width": 3537
+  },
+  "SE40-Floor2": {
+    "building": "SE40",
+    "floor": "2",
+    "height": 2298,
+    "image": "/data/floorplan-images/SE40-Floor2.png",
+    "width": 3541
+  },
+  "SE41-Floor1": {
+    "building": "SE41",
+    "floor": "1",
+    "height": 3578,
+    "image": "/data/floorplan-images/SE41-Floor1.png",
+    "width": 2282
+  },
+  "SE41-Floor2": {
+    "building": "SE41",
+    "floor": "2",
+    "height": 3672,
+    "image": "/data/floorplan-images/SE41-Floor2.png",
+    "width": 2282
+  },
+  "SE42-Floor1": {
+    "building": "SE42",
+    "floor": "1",
+    "height": 2188,
+    "image": "/data/floorplan-images/SE42-Floor1.png",
+    "width": 3430
+  },
+  "SE42-Floor2": {
+    "building": "SE42",
+    "floor": "2",
+    "height": 2187,
+    "image": "/data/floorplan-images/SE42-Floor2.png",
+    "width": 3430
+  },
+  "SE50-Floor1": {
+    "building": "SE50",
+    "floor": "1",
+    "height": 2187,
+    "image": "/data/floorplan-images/SE50-Floor1.png",
+    "width": 3429
+  },
+  "SE6-Floor1": {
+    "building": "SE6",
+    "floor": "1",
+    "height": 3430,
+    "image": "/data/floorplan-images/SE6-Floor1.png",
+    "width": 2187
+  },
+  "SE6-Floor2": {
+    "building": "SE6",
+    "floor": "2",
+    "height": 3430,
+    "image": "/data/floorplan-images/SE6-Floor2.png",
+    "width": 2187
+  },
+  "SE6-Floor3": {
+    "building": "SE6",
+    "floor": "3",
+    "height": 3432,
+    "image": "/data/floorplan-images/SE6-Floor3.png",
+    "width": 2190
+  },
+  "SE8-Floor1": {
+    "building": "SE8",
+    "floor": "1",
+    "height": 2249,
+    "image": "/data/floorplan-images/SE8-Floor1.png",
+    "width": 3466
+  },
+  "SE8-Floor2": {
+    "building": "SE8",
+    "floor": "2",
+    "height": 2294,
+    "image": "/data/floorplan-images/SE8-Floor2.png",
+    "width": 3536
+  },
+  "SE9-Floor1": {
+    "building": "SE9",
+    "floor": "1",
+    "height": 2187,
+    "image": "/data/floorplan-images/SE9-Floor1.png",
+    "width": 3429
+  },
+  "SW1-Floor1": {
+    "building": "SW1",
+    "floor": "1",
+    "height": 2376,
+    "image": "/data/floorplan-images/SW1-Floor1.png",
+    "width": 3672
+  },
+  "SW1-Floor2": {
+    "building": "SW1",
+    "floor": "2",
+    "height": 2285,
+    "image": "/data/floorplan-images/SW1-Floor2.png",
+    "width": 2941
+  },
+  "SW1-Floor3": {
+    "building": "SW1",
+    "floor": "3",
+    "height": 2292,
+    "image": "/data/floorplan-images/SW1-Floor3.png",
+    "width": 3454
+  },
+  "SW1-Floor4": {
+    "building": "SW1",
+    "floor": "4",
+    "height": 2259,
+    "image": "/data/floorplan-images/SW1-Floor4.png",
+    "width": 3503
+  },
+  "SW2-Floor1": {
+    "building": "SW2",
+    "floor": "1",
+    "height": 2190,
+    "image": "/data/floorplan-images/SW2-Floor1.png",
+    "width": 3433
+  },
+  "SW2-Floor2": {
+    "building": "SW2",
+    "floor": "2",
+    "height": 2187,
+    "image": "/data/floorplan-images/SW2-Floor2.png",
+    "width": 3429
+  },
+  "SW2-Floor3": {
+    "building": "SW2",
+    "floor": "3",
+    "height": 2187,
+    "image": "/data/floorplan-images/SW2-Floor3.png",
+    "width": 3429
+  },
+  "SW3-Floor1": {
+    "building": "SW3",
+    "floor": "1",
+    "height": 2294,
+    "image": "/data/floorplan-images/SW3-Floor1.png",
+    "width": 3536
+  },
+  "SW3-Floor2": {
+    "building": "SW3",
+    "floor": "2",
+    "height": 2295,
+    "image": "/data/floorplan-images/SW3-Floor2.png",
+    "width": 3537
+  },
+  "SW3-Floor3": {
+    "building": "SW3",
+    "floor": "3",
+    "height": 2296,
+    "image": "/data/floorplan-images/SW3-Floor3.png",
+    "width": 3538
+  },
+  "SW3-Floor4": {
+    "building": "SW3",
+    "floor": "4",
+    "height": 2295,
+    "image": "/data/floorplan-images/SW3-Floor4.png",
+    "width": 3537
+  },
+  "SW5-Floor1": {
+    "building": "SW5",
+    "floor": "1",
+    "height": 2189,
+    "image": "/data/floorplan-images/SW5-Floor1.png",
+    "width": 3431
+  },
+  "SW5-Floor2": {
+    "building": "SW5",
+    "floor": "2",
+    "height": 2185,
+    "image": "/data/floorplan-images/SW5-Floor2.png",
+    "width": 3427
+  },
+  "SW9-Floor1": {
+    "building": "SW9",
+    "floor": "1",
+    "height": 2187,
+    "image": "/data/floorplan-images/SW9-Floor1.png",
+    "width": 3429
+  },
+  "SW9-Floor2": {
+    "building": "SW9",
+    "floor": "2",
+    "height": 2162,
+    "image": "/data/floorplan-images/SW9-Floor2.png",
+    "width": 3404
+  }
+}

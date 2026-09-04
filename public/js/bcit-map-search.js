@@ -7,11 +7,11 @@
     const searchInput = document.getElementById("searchInput");
     const searchBtn = document.getElementById("searchBtn");
 
-    // Container for the dropdown
+    // Container for the dropdown (lives in the sidebar, under the search bar)
     const suggestionsEl = document.createElement("div");
     suggestionsEl.className = "map-search-suggestions";
-    const mapEl = document.getElementById("map");
-    if (mapEl) mapEl.appendChild(suggestionsEl);
+    const sidebarEl = document.getElementById("map-sidebar");
+    if (sidebarEl) sidebarEl.appendChild(suggestionsEl);
 
     // Data sources
     let buildingIndex = null;
@@ -25,18 +25,17 @@
       return buildingIndex;
     }
 
-    // Optionally load a global room index (if you create it).
-    // Shape suggestion: { building: "SW3", floor: "1", room: "1635", label: "SW3-1635" }
+    // The room index -- { building: "SW3", floor: "1", room: "1635",
+    // label: "SW3-1635" } -- is already being fetched by the core script for
+    // the sidebar's building list, so reuse that request rather than pulling
+    // the same (uncached, campus-wide) file down a second time.
     (async function loadRoomIndex() {
       try {
-        const res = await fetch("/data/room-search-index.json", {
-          cache: "no-store",
-        });
-        if (!res.ok) return;
-        const json = await res.json();
-        if (Array.isArray(json.rooms)) {
-          roomIndex = json.rooms;
-        }
+        const rooms = await (window.__ROOM_INDEX_PROMISE__ ||
+          fetch("/data/room-search-index.json", { cache: "no-store" })
+            .then((res) => (res.ok ? res.json() : { rooms: [] }))
+            .then((json) => json.rooms));
+        if (Array.isArray(rooms)) roomIndex = rooms;
       } catch {
         // fail silently, building-only search will still work
       }
@@ -234,12 +233,8 @@
     }
 
     function searchByBuilding(buildingCode) {
-      console.log("searching by building")
-
-      window.highlightPathTo({
-        building: buildingCode
-      });
-
+      // Searching for a building used to also draw a route to it from the
+      // middle of the map, which is not what searching means.
       const code = (buildingCode || "").trim().toUpperCase();
       if (!code) return;
 

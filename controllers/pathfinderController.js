@@ -1,45 +1,26 @@
-import { execFile } from "child_process";
-import path from "path";
-import { fileURLToPath } from "url";
+import { findIndoorPath } from "../services/indoorGraph.js";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
+// Indoor room-to-room routing. Historically this shelled out to a Python
+// A* script over a wall-raster grid that only existed for two buildings
+// (SW3, SW5); it now runs entirely in-process against the room/corridor/door
+// GeoJSON in public/data/floor-coordinates/, which covers the whole campus.
 export const handlePathRequest = (req, res) => {
-    console.log("REQ BODY:", req.body);
-    const { startBuildingCode, startRoom, goalBuildingCode, goalRoom } = req.body;
+    const { startBuildingCode, startRoom, goalBuildingCode, goalRoom, building } = req.body;
 
-    const startDirection = startBuildingCode.slice(0, 2).toLowerCase();
-    const startNumber = startBuildingCode.slice(2);
+    const buildingCode = (building || goalBuildingCode || startBuildingCode || "").toUpperCase();
 
-    const goalDirection = goalBuildingCode.slice(0, 2).toLowerCase();
-    const goalNumber = goalBuildingCode.slice(2);
-    const scriptPath = path.join(__dirname, "/pathFindingRoom.py");
-
-    const scriptArgs = [
-        startDirection,
-        startNumber,
-        startRoom,
-        goalDirection,
-        goalNumber,
-        goalRoom
-    ];
-
-    console.log("Running python script…");
-
-    execFile("python3", [scriptPath, ...scriptArgs], { cwd: path.join(__dirname, "../") }, (err, stdout, stderr) => {
-        if (err) {
-            console.error(stderr);
-            return res.status(500).json({
-                success: false,
-                error: stderr
-            });
-        }
-
-        console.log("Worked2");
-
-        res.json({
-            success: true,
-            output: stdout
+    if (startBuildingCode && goalBuildingCode &&
+        startBuildingCode.toUpperCase() !== goalBuildingCode.toUpperCase()) {
+        return res.json({
+            success: false,
+            message: "Cross-building indoor routing isn't supported yet -- start and goal must be in the same building.",
         });
-    });
+    }
+
+    if (!buildingCode || !startRoom || !goalRoom) {
+        return res.status(400).json({ success: false, message: "building, startRoom and goalRoom are required." });
+    }
+
+    const result = findIndoorPath(buildingCode, startRoom, goalRoom);
+    res.json(result);
 };
