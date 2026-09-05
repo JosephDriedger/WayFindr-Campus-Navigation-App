@@ -22,6 +22,7 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { isPlace, placeCentre, normalizePlaceName } from "./places.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const NAV_GRAPH_PATH = path.join(__dirname, "..", "public", "data", "nav-graph.json");
@@ -146,8 +147,41 @@ function loadGraph() {
     byBuilding.get(n.building).push(n.id);
   });
 
+  // Which island of the network each node is on, and which island is the
+  // network proper. A traced campus picks up strays -- a node dropped and
+  // never linked to anything -- and the nearest node to a point is sometimes
+  // one of them: Lot A's nearest node was an orphan two hundred metres away
+  // with no links at all, so every route from Lot A came back "those two are
+  // on parts of the network that are not linked to each other". Snapping a
+  // point onto the network has to mean the part you can walk on.
+  const component = new Array(nodes.length).fill(-1);
+  const sizes = [];
+  for (let start = 0; start < nodes.length; start += 1) {
+    if (component[start] !== -1) continue;
+    const id = sizes.length;
+    let size = 0;
+    const stack = [start];
+    component[start] = id;
+    while (stack.length) {
+      const u = stack.pop();
+      size += 1;
+      for (const [v] of adj[u]) {
+        if (component[v] === -1) {
+          component[v] = id;
+          stack.push(v);
+        }
+      }
+    }
+    sizes.push(size);
+  }
+  const mainComponent = sizes.length
+    ? sizes.indexOf(Math.max(...sizes))
+    : -1;
+
   const buildings = new Set(nodes.map((n) => n.building).filter(Boolean));
-  const graph = { nodes, adj, byRoom, byBuilding, buildings, key };
+  const graph = {
+    nodes, adj, byRoom, byBuilding, buildings, key, component, mainComponent,
+  };
   cached = { mtimeMs: stat.mtimeMs, graph };
   return graph;
 }
@@ -155,6 +189,67 @@ function loadGraph() {
 /** Forget the loaded network, so the next route reads it fresh. */
 export function invalidateCache() {
   cached = null;
+}
+
+// The spaces that join one floor to another. Not somewhere you are sent, but
+// the only way of getting between two floors that is worth drawing.
+const VERTICAL_SPACES = new Set(["stairs", "elevator"]);
+
+/**
+ * The stairs and lifts each floor of a building can actually get to.
+ *
+ * A stairwell is one shaft through the whole building, but it is traced on
+ * whichever sheet somebody happened to draw it on -- in SW3 that is floor 1
+ * and nowhere else. So floor 2 was drawn showing no stairs at all, while the
+ * network quietly ran up four of them to reach it: you could be told to take
+ * the NW stairs and have nothing on the map to take.
+ *
+ * The links say which. A node on one floor joined to a node standing in a
+ * stairwell on another means that stairwell reaches this floor, and belongs
+ * on it. Nothing is inferred from geometry -- a shaft that nobody has linked
+ * to this floor does not open onto it, whatever it sits above.
+ *
+ * Returns { "<floor>": [{ room, name, space, floor }] }, where `floor` is the
+ * sheet the outline is traced on, so the caller knows where to find it.
+ */
+export function verticalSpacesByFloor(building) {
+  const code = String(building || "").trim().toUpperCase();
+  const graph = code ? loadGraph() : null;
+  if (!graph) return {};
+
+  const out = new Map();   // floor -> Map(room -> entry)
+  const isVertical = (n) => VERTICAL_SPACES.has(n.space) && n.room;
+
+  const carry = (onto, from) => {
+    // The floor a shaft is traced on already draws it.
+    if (String(onto.floor) === String(from.floor)) return;
+    const floor = String(onto.floor);
+    if (!out.has(floor)) out.set(floor, new Map());
+    const seen = out.get(floor);
+    if (seen.has(from.room)) return;
+    seen.set(from.room, {
+      room: from.room,
+      name: from.name || null,
+      space: from.space,
+      floor: String(from.floor),
+    });
+  };
+
+  // Walked through the adjacency, so every link is seen from both ends --
+  // which is what is wanted here: either end may be the stairwell.
+  graph.nodes.forEach((a, i) => {
+    if (a.building !== code || a.floor == null) return;
+    for (const [j] of graph.adj[i] || []) {
+      const b = graph.nodes[j];
+      if (!b || b.building !== code || b.floor == null) continue;
+      if (String(a.floor) === String(b.floor)) continue;
+      if (isVertical(b)) carry(a, b);
+    }
+  });
+
+  const result = {};
+  for (const [floor, rooms] of out) result[floor] = [...rooms.values()];
+  return result;
 }
 
 /**
@@ -181,6 +276,101 @@ function nodesFor(graph, building, room) {
   return graph.byRoom.get(graph.key(building, bare))
     || graph.byRoom.get(graph.key(building, wanted))
     || [];
+}
+
+/**
+ * The ones you could actually walk to or from.
+ *
+ * A node is dropped before it is linked, so while a floor is being traced the
+ * network is full of loose ones. They are real nodes and they are in the
+ * graph; they are just not yet part of anything you can walk.
+ */
+function onNetwork(graph, ids) {
+  if (graph.mainComponent < 0) return ids;
+  return ids.filter((id) => graph.component[id] === graph.mainComponent);
+}
+
+/**
+ * The nearest node a walk from this point could actually join.
+ *
+ * Only the main body of the network counts. A stray node -- traced and never
+ * linked to anything -- is nearer to some points than any real path is, and
+ * snapping to one produces a route that cannot reach anywhere.
+ */
+function nearestNode(graph, lng, lat) {
+  let best = null;
+  let bestD = Infinity;
+  for (const n of graph.nodes) {
+    if (graph.mainComponent >= 0 && graph.component[n.id] !== graph.mainComponent) continue;
+    const d = haversine([lng, lat], [n.lng, n.lat]);
+    if (d < bestD) { bestD = d; best = n.id; }
+  }
+  return best === null ? null : { id: best, metres: bestD };
+}
+
+// Closer than this to the node it snapped to, a point is that node: drawing a
+// two metre stub from a pin to the path it is standing on is noise.
+const SNAP_NOISE_M = 5;
+
+/**
+ * What one end of a route means, in nodes.
+ *
+ * Three kinds of thing can be asked for, and they are tried in this order
+ * because each is more specific than the next:
+ *
+ *   a point       {lng, lat} -- where the phone says you are, or where "Start
+ *                 Here" was pressed. Snaps to the nearest node.
+ *   a place       "LOT Q", "SW3" -- somewhere with an outline on the map. If
+ *                 it has nodes they are the answer; if nobody has traced a
+ *                 path into it, its middle is a point and snaps like one.
+ *   a room        "1750", "SW3-1750" -- the nodes that serve it. A room with
+ *                 no node stays an error: falling back to the building would
+ *                 quietly take someone to the wrong place, which is worse
+ *                 than saying the room is not mapped.
+ *
+ * Returns { ids, anchor } where anchor is the point the route should be drawn
+ * from or to when it is not a node itself, or { ids: [] } when nothing
+ * answers to the reference at all.
+ */
+function resolveEnd(graph, ref, fallbackBuilding) {
+  const asPoint = (lng, lat, label) => {
+    const near = nearestNode(graph, lng, lat);
+    if (!near) return { ids: [] };
+    return {
+      ids: [near.id],
+      anchor: near.metres > SNAP_NOISE_M ? { lng, lat, label: label || null } : null,
+    };
+  };
+
+  if (ref && typeof ref === "object") {
+    const lng = Number(ref.lng);
+    const lat = Number(ref.lat);
+    if (!Number.isFinite(lng) || !Number.isFinite(lat)) return { ids: [] };
+    return asPoint(lng, lat, ref.label);
+  }
+
+  const text = normalizePlaceName(ref);
+  if (!text) return { ids: [] };
+
+  // A name is checked whole before it is taken apart. "LOT Q" split on the
+  // space is room Q of a building called LOT, which is nothing at all.
+  if (graph.buildings.has(text)) {
+    // Only nodes you could actually walk to. A node is dropped before it is
+    // linked, so the network always has loose ones in it while a floor is
+    // being traced -- and one loose node standing in Lot Q was enough to make
+    // the whole car park "somewhere with nodes", which sent every route to a
+    // dot joined to nothing. A place whose only nodes are off the network has
+    // nothing usable, so it falls through to its outline below.
+    const ids = onNetwork(graph, graph.byBuilding.get(text) || []);
+    if (ids.length) return { ids };
+  }
+  if (isPlace(text)) {
+    const spot = placeCentre(text);
+    return spot ? asPoint(spot.lng, spot.lat, spot.name) : { ids: [] };
+  }
+
+  const parsed = parseRef(ref, fallbackBuilding);
+  return { ids: nodesFor(graph, parsed.building, parsed.room) };
 }
 
 /**
@@ -270,29 +460,29 @@ export function findIndoorPath(building, startRoom, goalRoom) {
   if (!graph || !graph.nodes.length) {
     return { success: false, message: "No indoor map data has been built yet." };
   }
-  if (!graph.buildings.has(code)) {
-    return {
-      success: false,
-      message: `There is no indoor map data for ${code} yet.`,
-    };
-  }
 
-  // A bare code that names a building is that building, not a room inside the
-  // one being looked at: "SW3-1990 to SW7" crosses the campus, it does not
-  // look for a room called SW7 in SW3.
-  const asBuilding = (ref) => {
-    // collapse repeated spaces so "LOT  A" and "LOT A" are the same place
-    const text = String(ref ?? "").trim().toUpperCase().replace(/\s+/g, " ");
-    return graph.buildings.has(text) ? { building: text, room: "" } : null;
-  };
-  const from = asBuilding(startRoom) || parseRef(startRoom, code);
-  const to = asBuilding(goalRoom) || parseRef(goalRoom, code);
-  const starts = nodesFor(graph, from.building, from.room);
-  const goals = nodesFor(graph, to.building, to.room);
+  // The building being looked at is only ever a fallback for a bare room
+  // number now. It used to be checked against the network up front, which
+  // refused every route that started somewhere untraced -- a car park with no
+  // nodes in it -- before either end had been looked at.
+  const fromEnd = resolveEnd(graph, startRoom, code);
+  const toEnd = resolveEnd(graph, goalRoom, code);
+  const starts = fromEnd.ids;
+  const goals = toEnd.ids;
+
+  // What to call each end in an error, which is the caller's own words --
+  // a point has none, so it is described rather than quoted.
+  const describe = (ref, fallback) => (
+    ref && typeof ref === "object" ? "that spot" : quoted(ref || fallback)
+  );
+  const from = typeof startRoom === "object"
+    ? { building: code, room: "" } : parseRef(startRoom, code);
+  const to = typeof goalRoom === "object"
+    ? { building: code, room: "" } : parseRef(goalRoom, code);
 
   const missing = [
-    !starts.length && quoted(startRoom || from.building),
-    !goals.length && quoted(goalRoom || to.building),
+    !starts.length && describe(startRoom, from.building),
+    !goals.length && describe(goalRoom, to.building),
   ].filter(Boolean);
   if (missing.length) {
     // Naming what is missing matters: a room with no node is a room nobody
@@ -319,25 +509,60 @@ export function findIndoorPath(building, startRoom, goalRoom) {
     lat: n.lat,
   });
 
+  /**
+   * The stretch between a point and the node it snapped to, as a route point.
+   *
+   * Somewhere with no traced path into it -- a car park, a spot on the lawn
+   * somebody pressed "Start Here" on -- is not on the network, and pretending
+   * the route begins at the nearest node instead would show a line starting a
+   * few hundred metres from where the person is standing with no explanation.
+   * It is drawn, so the approach is visible and counted, and marked as an
+   * anchor so the directions can say it is a walk to the paths rather than
+   * along one.
+   */
+  const toAnchor = (anchor) => ({
+    building: null,
+    floor: null,
+    room: null,
+    name: anchor.label || null,
+    space: null,
+    kind: "anchor",
+    type: "anchor",
+    lng: anchor.lng,
+    lat: anchor.lat,
+  });
+
   // Nothing asked for is not the same as asking for where you already are.
   // A building destination arrives as its own name, so an empty goal really
   // is empty rather than "the building I am in".
-  if (!String(goalRoom ?? "").trim()) {
+  if (goalRoom == null || (typeof goalRoom !== "object" && !String(goalRoom).trim())) {
     return { success: false, message: "No destination given." };
   }
+
+  const withAnchors = (points) => {
+    const out = [...points];
+    if (fromEnd.anchor) out.unshift(toAnchor(fromEnd.anchor));
+    if (toEnd.anchor) out.push(toAnchor(toEnd.anchor));
+    return out;
+  };
 
   const shared = starts.filter((s) => goals.includes(s));
   if (shared.length) {
     // Asking for a building you are already standing in is not a route. A
     // 0 m answer is true and useless; saying so and asking for a room is
-    // what the person actually needs.
-    if (!to.room || to.room.toUpperCase() === to.building) {
+    // what the person actually needs. Two untraced places that snapped to the
+    // same node are a different thing -- the walk between them is real, even
+    // though the network has nothing in between -- so this only applies when
+    // neither end brought its own point.
+    if (!fromEnd.anchor && !toEnd.anchor
+      && (!to.room || to.room.toUpperCase() === to.building)) {
       return {
         success: false,
         message: `You are already in ${to.building}. Pick a room to route to.`,
       };
     }
-    return { success: true, path: [toPoint(graph.nodes[shared[0]])], distanceM: 0 };
+    const points = withAnchors([toPoint(graph.nodes[shared[0]])]);
+    return { success: true, path: points, distanceM: Math.round(pathLengthM(points)) };
   }
 
   // The rooms this route is allowed inside: the one it starts in and the one
@@ -354,7 +579,7 @@ export function findIndoorPath(building, startRoom, goalRoom) {
     };
   }
 
-  const points = route.map((id) => toPoint(graph.nodes[id]));
+  const points = withAnchors(route.map((id) => toPoint(graph.nodes[id])));
   return {
     success: true,
     path: points,

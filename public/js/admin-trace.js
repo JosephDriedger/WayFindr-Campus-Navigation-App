@@ -127,6 +127,20 @@ const PARKING_SRC = "campus-parking";
 const OVERVIEW_SRC = "traced-overview";
 const DRAFT_SRC = "draft-room";
 
+/**
+ * A colour per kind of node, by where it stands relative to the open sheet.
+ *
+ * Amber is the floor you are working on; everything else is somewhere you are
+ * linking OUT to, and says which kind of somewhere. Kept in one table so the
+ * dots on the map and the key beside them cannot drift apart.
+ */
+const ZONE_COLOURS = {
+  here:    { dot: "#f59e0b", label: "This floor" },
+  floor:   { dot: "#10b981", label: "Other floor" },
+  other:   { dot: "#ec4899", label: "Other building" },
+  outside: { dot: "#64748b", label: "Outdoors" },
+};
+
 // ---------------------------------------------------------------------------
 // Plan space <-> world
 //
@@ -236,7 +250,13 @@ function ensureLayers() {
         // sixty-odd identical dots you are about to change
         "circle-radius": ["case", ["get", "selected"], 9, 6],
         "circle-color": ["case", ["get", "selected"], "#1a73e8",
-          ["match", ["get", "type"], "entrance", "#16a34a", "#f59e0b"]],
+          ["match", ["get", "type"], "entrance", "#16a34a",
+            // A node's colour says where it stands relative to the sheet you
+            // have open, so the one you are about to link to is the one you
+            // meant. See nodeZone().
+            ["match", ["get", "zone"],
+              ...Object.entries(ZONE_COLOURS).flatMap(([zone, c]) => [zone, c.dot]),
+              ZONE_COLOURS.here.dot]]],
         "circle-stroke-color": "#fff",
         "circle-stroke-width": ["case", ["get", "selected"], 3, 2],
       },
@@ -382,6 +402,86 @@ const nodeById = (nid) => {
   }
   return nidIndex.get(nid);
 };
+
+// ---------------------------------------------------------------------------
+// One floor at a time
+//
+// The walking network is the whole campus and every traced sheet is drawn as
+// context, so opening floor 2 of a building laid floor 1 underneath it: its
+// outlines, its nodes and its links, sitting exactly on top of the drawing
+// being traced and none of them yours to edit. You cannot see what you are
+// tracing, and every click risks the wrong floor.
+//
+// So what belongs to another floor of the building you have open is hidden --
+// except the stairs and the lifts. Those are the one thing you need FROM the
+// floor below: a stairwell has to land in the same place on every floor, and
+// there is nothing else to line it up against.
+//
+// Another building is not another floor. Its outlines sit beside yours rather
+// than over them, and its nodes are what a door links to when a route leaves
+// the building, so they stay. So does anything with no floor at all -- the
+// paths across the campus belong to no storey.
+// ---------------------------------------------------------------------------
+const VERTICAL_TYPES = new Set(["stairs", "elevator"]);
+
+/** Off only when someone has asked to see every floor at once. */
+let floorFocus = true;
+
+/** How a space is named across the campus: "SW5|2|1840". */
+const spaceKey = (building, floor, room) =>
+  `${String(building || "").toUpperCase()}|${floor ?? ""}|${String(room || "").toUpperCase()}`;
+
+// What kind of space each traced outline is, on every sheet. A node says
+// which room it serves but not what that room IS, and the outline that would
+// say so is on a floor that is not open -- which is exactly the case this has
+// to answer. Built from the overview, which has already fetched every sheet.
+let spaceTypes = new Map();
+function indexSpaceTypes(features) {
+  const index = new Map();
+  for (const f of features) {
+    const p = f.properties || {};
+    if (!p.room || !p.type) continue;
+    index.set(spaceKey(p.building, p.floor, p.room), p.type);
+  }
+  spaceTypes = index;
+}
+
+/** Is this on a floor other than the one open? */
+function onOtherFloor(item) {
+  if (!current) return false;              // no sheet open: nothing to be off
+  const floor = item.floor ?? null;
+  if (floor === null || floor === "") return false;   // belongs to no storey
+  const building = String(item.building || "").toUpperCase();
+  if (building !== String(current.building).toUpperCase()) return false;
+  return String(floor) !== String(current.floor);
+}
+
+/** Does it connect floors -- a stairwell or a lift? */
+function isVerticalSpace(item) {
+  // An outline says what it is. A node only says which space it stands in, so
+  // what that space is has to be looked up on the sheet it was traced on.
+  const type = item.type === "node"
+    ? spaceTypes.get(spaceKey(item.building, item.floor, item.room))
+    : item.type;
+  return VERTICAL_TYPES.has(type);
+}
+
+/**
+ * Is this item on a floor you do not have open, and therefore out of the way?
+ *
+ * A link goes when either end does: a line drawn to a node that is not there
+ * is a line into empty space, and there is nothing useful to do with it.
+ */
+function onHiddenFloor(item) {
+  if (!floorFocus || !current || !item) return false;
+  if (item.kind === "path") {
+    return (item.nodes || []).some((nid) => {
+      const end = nodeById(nid);
+      return end ? onHiddenFloor(end) : false;
+    });
+  }
+  return onOtherFloor(item) && !isVerticalSpace(item);
+}
 
 /**
  * Where an item is, in the world.
@@ -597,6 +697,39 @@ function buildingAt(lngLat) {
 }
 
 /**
+ * Where a node stands relative to the sheet that is open, which is what its
+ * colour says.
+ *
+ * Every node on campus is drawn while you work -- that is the point, since a
+ * path runs out of one building and into the next -- but they were all the
+ * same amber dot. Six hundred identical dots is not a network you can read:
+ * linking SW3 to SE12 meant clicking a dot and hoping it was SE12's.
+ *
+ * A node in this building with no floor of its own -- one standing at its
+ * door -- belongs to whichever floor you have open, because that is the floor
+ * it opens onto.
+ */
+function nodeZone(r) {
+  if (!current) return "here";        // no sheet open: nothing to be far from
+  const building = String(r.building || "").toUpperCase();
+  if (!building) return "outside";
+  if (building !== String(current.building).toUpperCase()) return "other";
+  if (r.floor == null || String(r.floor) === String(current.floor)) return "here";
+  return "floor";
+}
+
+/** Where a node is, in words: "SE12", "SW3 floor 2 · 2704", "outdoors". */
+function whereIs(node) {
+  if (!node) return "somewhere";
+  const parts = [];
+  if (node.building) parts.push(node.building);
+  else parts.push("outdoors");
+  if (node.floor != null && node.floor !== "") parts.push(`floor ${node.floor}`);
+  const where = parts.join(" ");
+  return node.room ? `${where} · ${node.room}` : where;
+}
+
+/**
  * A walking node, as it is stored: a position in the world, the building it
  * stands in and the space it serves. No plan-space coordinates and no source
  * sheet -- the node is not part of a drawing.
@@ -616,6 +749,8 @@ function nodeFeature(r) {
       building: r.building ?? null,
       floor: r.floor ?? null,
       room: r.room || null,
+      // only for drawing; the saved file never sees it
+      zone: nodeZone(r),
     },
     geometry: { type: "Point", coordinates: itemLngLat(r) },
   };
@@ -623,6 +758,9 @@ function nodeFeature(r) {
 
 /** The map copy of an item, tagged with where it lives in the list. */
 function renderFeature(r, i) {
+  // Drawn, not deleted: an item on another floor is still part of the network
+  // and is still saved. It is only kept off the sheet you are working on.
+  if (onHiddenFloor(r)) return null;
   const f = roomFeature(r);
   if (!f) return null;
   // only for hit-testing and labelling on the map; the saved file never sees it
@@ -684,6 +822,7 @@ function scheduleListRender() {
     listPending = null;
     const t0 = performance.now();
     renderRoomList();
+    renderZoneKey();
     if (profile) profile.list = Math.round((performance.now() - t0) * 10) / 10;
   }, 16);
 }
@@ -983,7 +1122,7 @@ function pointIndexNear(lngLat) {
   let best = -1, bestD = SNAP_PX;
   for (let i = 0; i < rooms.length; i += 1) {
     const r = rooms[i];
-    if (r.kind !== "point" || !itemInMode(r)) continue;
+    if (r.kind !== "point" || !itemInMode(r) || onHiddenFloor(r)) continue;
     const at = itemLngLat(r);
     if (!at) continue;
     // the cheap rejection, before the expensive projection
@@ -1003,6 +1142,9 @@ function nodeNear(lngLat) {
   let best = null, bestD = SNAP_PX;
   for (const r of rooms) {
     if (r.kind !== "point" || r.type !== "node") continue;
+    // Snapping to a node you cannot see is how a link ends up joining the
+    // floor below by accident.
+    if (onHiddenFloor(r)) continue;
     const at = itemLngLat(r);
     if (!at) continue;
     if (Math.abs(at[0] - lngLat.lng) > reach.lng) continue;
@@ -1096,7 +1238,10 @@ function onMapClick(e) {
     const first = draft.length ? draft[0] : null;
     if (!first) {
       draft.push(node.nid);
-      setDrawHint("Now click the node to link it to.");
+      // Which node you picked, named. Six hundred dots look alike, and a link
+      // out of this building is exactly the case where being one dot off
+      // matters -- so both ends are said out loud rather than assumed.
+      setDrawHint(`From ${whereIs(node)}. Now click the node to link it to.`);
       return;
     }
     if (first === node.nid) {
@@ -1115,9 +1260,10 @@ function onMapClick(e) {
     selected = -1;
     redrawRooms();
     markDirty();
+    const joined = `${whereIs(nodeById(first))} ↔ ${whereIs(node)}`;
     setDrawHint(existing >= 0
-      ? "Unlinked. Click the same two nodes again to put it back."
-      : "Linked. Click a node to start another link.");
+      ? `Unlinked ${joined}. Click the same two again to put it back.`
+      : `Linked ${joined}. Click a node to start another link.`);
     return;
   }
 
@@ -1134,6 +1280,10 @@ function onMapClick(e) {
     const ll = [e.lngLat.lng, e.lngLat.lat];
     // which traced room it lands in, if a floor is open to land on
     const servedRoom = roomAtUv(lngLatToUv(ll));
+    // and which place it is standing in -- a building, or a car park, which
+    // is what makes "take me to Lot L" mean anything. Worked out once: it is
+    // asked for three times below and it walks the campus outlines.
+    const place = buildingAt(ll);
     forgetNodeIndex();
     rooms.push({
       kind: "point", type: "node", nid: newNodeId(),
@@ -1141,17 +1291,23 @@ function onMapClick(e) {
       // drawing that happened to be open when it was placed
       ll,
       room: servedRoom,
-      building: buildingAt(ll),
+      building: place,
       // the floor only means something if this is the building whose floor
       // is open; a node dropped anywhere else is on no particular floor
-      floor: current && buildingAt(ll) === current.building ? current.floor : null,
+      floor: current && place === current.building ? current.floor : null,
     });
     redrawRooms();
     markDirty();
     const n = rooms.filter((r) => r.type === "node").length;
-    setDrawHint(servedRoom
-      ? `${n} nodes placed — this one serves ${servedRoom}.`
-      : `${n} nodes placed — this one is not inside a numbered outline.`);
+    // What it serves and where it stands are two different things, and the
+    // second is the one that matters in a car park -- there are no room
+    // numbers out there, so "not inside a numbered outline" was the only
+    // thing a node in Lot L had ever been told about itself.
+    const where = servedRoom
+      ? `serves ${servedRoom}${place ? ` in ${place}` : ""}`
+      : place ? `is in ${place}`
+        : "is outdoors, in no building or lot";
+    setDrawHint(`${n} nodes placed — this one ${where}.`);
     return;
   }
 
@@ -1288,8 +1444,35 @@ function fillList(list, entries, emptyText, opts = {}) {
   });
 }
 
+/**
+ * The key to the node colours, written from the same table that paints them.
+ *
+ * Counted, because the useful question is not "what does pink mean" but "how
+ * many nodes are there in the next building for me to link to".
+ */
+function renderZoneKey() {
+  const key = el("zoneKey");
+  if (!key) return;
+  const counts = {};
+  for (const r of rooms) {
+    if (r.type !== "node" || onHiddenFloor(r)) continue;
+    const zone = nodeZone(r);
+    counts[zone] = (counts[zone] || 0) + 1;
+  }
+  key.innerHTML = Object.entries(ZONE_COLOURS)
+    // With no sheet open every node is "here", so the other three would be a
+    // row of zeroes explaining a distinction that is not being drawn.
+    .filter(([zone]) => counts[zone] || (zone === "here" && current))
+    .map(([zone, c]) => `<li><i style="background:${c.dot}"></i>${esc(c.label)}
+      <b>${counts[zone] || 0}</b></li>`)
+    .join("");
+}
+
 function renderRoomList() {
-  const shown = rooms.map((r, i) => ({ r, i })).filter(({ r }) => itemInMode(r));
+  // The list matches the map. Offering a row for something that is not drawn
+  // means selecting it scrolls to a highlight nobody can see.
+  const shown = rooms.map((r, i) => ({ r, i }))
+    .filter(({ r }) => itemInMode(r) && !onHiddenFloor(r));
 
   // Nodes and links are different things, and there are hundreds of each.
   // One list holding both meant scrolling past two hundred links to reach a
@@ -1655,8 +1838,16 @@ async function saveFloor() {
     // meant tracing a node into SW7, saving, and still being told SW7 had no
     // node -- true of the graph, and nothing to do with what you had drawn.
     await rebuildDerived();
+    // A floor with outlines on it is a traced floor, so the picker says so
+    // now rather than at the next page load.
+    // A floor with outlines on it is a traced floor, and the tick that says
+    // so should appear on saving rather than at the next page load. The
+    // count is the server's, so the tick and the file cannot disagree.
     const plan = plans.find((p) => p.stem === current.stem);
-    if (plan) plan.traced = true;
+    if (plan && plan.traced !== (data.features > 0)) {
+      plan.traced = data.features > 0;
+      renderPlanOptions();
+    }
     // what was just written is now part of the overview for other floors
     overviewFeatures = overviewFeatures.filter((f) => f.properties.stem !== current.stem)
       .concat(planItems.map(roomFeature).filter(Boolean).map((f) => ({
@@ -1730,6 +1921,28 @@ function networkDelta(features) {
 }
 
 /** Write the campus network. Returns what the server says it stored. */
+/**
+ * Take back the places the server worked out.
+ *
+ * Which building or car park a node stands in is decided again when the file
+ * is written, so a node dropped before the campus outlines had loaded still
+ * ends up mapped to the lot it is sitting in. That answer has to come back
+ * into the working copy: leaving it on the server would mean the page carries
+ * on from a picture the file disagrees with, and the next save would send the
+ * blank straight back.
+ */
+function applyPlacements(placed, features) {
+  if (!Array.isArray(placed) || !placed.length) return;
+  const byNid = new Map(placed.map((p) => [p.nid, p.building]));
+  for (const r of rooms) {
+    if (r.type === "node" && byNid.has(r.nid)) r.building = byNid.get(r.nid);
+  }
+  for (const f of features) {
+    const nid = f.properties?.nid;
+    if (nid && byNid.has(nid)) f.properties.building = byNid.get(nid);
+  }
+}
+
 async function saveNetwork() {
   if (!networkLoaded) {
     throw new Error(
@@ -1750,6 +1963,7 @@ async function saveNetwork() {
         featureCollection: { type: "FeatureCollection", features },
       }),
     });
+    applyPlacements(result.placed, features);
     markNetworkSynced(features, result.version);
     return result;
   };
@@ -1783,6 +1997,7 @@ async function saveNetwork() {
     return writeEverything();
   }
 
+  applyPlacements(result.placed, features);
   markNetworkSynced(features, result.version);
   return result;
 }
@@ -1914,6 +2129,7 @@ async function loadPlan(stem) {
     `${current.building} floor ${current.floor} — ${outlines} outline${outlines === 1 ? "" : "s"}`
     + (netCount ? `, ${netCount} in the walking network` : "");
   drawOverview();
+  updateFloorFocus();
 
   // Open framed on the drawing, which is where the tracing happens.
   // Positioning is a separate step, taken when you are ready for it.
@@ -1959,13 +2175,28 @@ loadCampus();   // the campus is context for everything, so it loads up front
   const src = map.getSource(OVERVIEW_SRC);
   if (!src) return whenStyleReady(drawOverview);
   const skip = current?.stem;
-  const shown = overviewFeatures.filter((f) => f.properties.stem !== skip);
+  // Sheets showing only part of themselves, because the floor they are on is
+  // not the one open. They get no label: "SW5 · Floor 1" written across two
+  // stairwells says a whole floor is drawn there when it is not.
+  const partial = new Set();
+  const shown = overviewFeatures.filter((f) => {
+    if (f.properties.stem === skip) return false;
+    // Another floor of this building is drawn on top of the sheet being
+    // traced, which is the whole reason for hiding it; its stairwells stay,
+    // because that is what the floor above lines up against.
+    if (onHiddenFloor(f.properties)) {
+      partial.add(f.properties.stem);
+      return false;
+    }
+    return true;
+  });
 
   // A label per sheet, placed in the middle of what has been traced on it.
   const bounds = new Map();
   for (const f of shown) {
     if (f.geometry?.type !== "Polygon") continue;
     const stem = f.properties.stem;
+    if (partial.has(stem)) continue;
     const b = bounds.get(stem) || { x0: 180, y0: 90, x1: -180, y1: -90 };
     for (const [x, y] of f.geometry.coordinates[0]) {
       b.x0 = Math.min(b.x0, x); b.y0 = Math.min(b.y0, y);
@@ -1985,6 +2216,26 @@ loadCampus();   // the campus is context for everything, so it loads up front
   }));
 
   src.setData({ type: "FeatureCollection", features: [...shown, ...labels] });
+}
+
+/**
+ * The floor picker, with a tick beside every sheet that has something on it.
+ *
+ * Redrawn rather than written once, because what is ticked changes: tracing a
+ * floor and saving it makes it a traced floor. The list was built at page
+ * load and never again, so the floor you had just finished stayed unticked
+ * until you reloaded -- which reads as "that did not save".
+ *
+ * The selection is put back afterwards: replacing the options clears it, and
+ * the picker is how you know which floor you are on.
+ */
+function renderPlanOptions() {
+  const picker = el("planPicker");
+  if (!picker) return;
+  const chosen = picker.value;
+  picker.innerHTML = '<option value="">Choose a Floor…</option>' +
+    plans.map((p) => `<option value="${esc(p.stem)}">${esc(p.building)} — floor ${esc(p.floor)}${p.traced ? " ✓" : ""}</option>`).join("");
+  if (chosen) picker.value = chosen;
 }
 
 /**
@@ -2019,9 +2270,15 @@ async function loadOverview() {
     }
   }));
   overviewFeatures = results.flat();
+  // Every sheet has now been read, which is the only place the type of a
+  // space on a floor that is not open can be found -- so a node standing in
+  // the stairwell of the floor below can be recognised as one.
+  indexSpaceTypes(overviewFeatures);
   // The style may still be loading when the fetches land, so draw now AND
   // once it is ready -- whichever happens second is the one that sticks.
   drawOverview();
+  redrawRooms();   // nodes can only be placed by floor once the types are known
+  updateFloorFocus();
   whenStyleReady(drawOverview);
 }
 
@@ -2036,8 +2293,7 @@ const loadPlanList = async () => {
   plans = data.plans || [];
 
   const picker = el("planPicker");
-  picker.innerHTML = '<option value="">Choose a Floor…</option>' +
-    plans.map((p) => `<option value="${esc(p.stem)}">${esc(p.building)} — floor ${esc(p.floor)}${p.traced ? " ✓" : ""}</option>`).join("");
+  renderPlanOptions();
   picker.addEventListener("change", () => {
     if (!picker.value) return;
     loadPlan(picker.value).then(rememberSession);
@@ -2260,6 +2516,49 @@ function setPlanHidden(hidden) {
 }
 
 el("togglePlan").addEventListener("click", () => setPlanHidden(!planHidden));
+
+/**
+ * Say how much of the campus the open floor is hiding.
+ *
+ * Something disappearing with no explanation is worse than the clutter it
+ * was hiding: without this, opening floor 2 silently loses a hundred nodes
+ * and the only clue is a count in the status line that no longer matches.
+ */
+function updateFloorFocus() {
+  const field = el("floorFocusField");
+  if (!field) return;
+  field.hidden = !current;
+  const label = el("floorFocusCount");
+  if (!label || !current) return;
+  if (!floorFocus) {
+    label.textContent = "every floor is showing";
+    return;
+  }
+  let hidden = 0;
+  let kept = 0;
+  // Counted through the same test that does the hiding, so the number cannot
+  // drift from what is actually on the map. A link is not on any floor itself
+  // -- it is hidden because a node it joins is -- which is why counting only
+  // the things that carry a floor said 130 when 217 had gone.
+  const tally = (item) => {
+    if (onHiddenFloor(item)) hidden += 1;
+    else if (onOtherFloor(item) && isVerticalSpace(item)) kept += 1;
+  };
+  rooms.forEach(tally);
+  for (const f of overviewFeatures) {
+    if (f.properties.stem !== current.stem) tally(f.properties);
+  }
+  label.textContent = hidden
+    ? `${hidden} hidden on other floors${kept ? `, ${kept} stairs and lifts kept` : ""}`
+    : "stairs and lifts still show";
+}
+
+el("floorFocus")?.addEventListener("change", (e) => {
+  floorFocus = e.target.checked;
+  redrawRooms();
+  drawOverview();
+  updateFloorFocus();
+});
 
 window.addEventListener("keydown", (e) => {
   if (e.key !== "h" && e.key !== "H") return;

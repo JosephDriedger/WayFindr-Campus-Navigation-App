@@ -162,7 +162,11 @@ window.addEventListener("DOMContentLoaded", () => {
 
   const RECENTS_KEY = 'wayfindr.recentRooms';
   const RECENTS_MAX = 8;
-  const recentKey = (r) => `${r.building}|${r.floor || ''}|${r.room}`;
+  // A room number is unique within its building, so the floor is not part of
+  // what makes two entries the same room. It was, and the result was SW5-1840
+  // listed twice over: once from opening it, which knows the floor, and once
+  // from arriving there, which does not.
+  const recentKey = (r) => `${r.building}|${r.room}`;
 
   // localStorage throws outright in some privacy modes, so every access is
   // guarded -- a browser that can't remember recents should still get a
@@ -174,6 +178,7 @@ window.addEventListener("DOMContentLoaded", () => {
       // A room number never contains its own building code. Entries that do
       // were written by a bug, and there is no point making someone clear
       // their history by hand to be rid of them.
+      const seen = new Set();
       return v.filter((r) => {
         if (!r || !r.building || !r.room) return false;
         const room = String(r.room).toUpperCase();
@@ -184,7 +189,13 @@ window.addEventListener("DOMContentLoaded", () => {
         if (buildingCodes.has(`${building} ${room}`)) return false;
         // a room whose "number" is another building's code -- "SW3-SW7" --
         // came from a destination reference being stored whole
-        return !buildingCodes.has(room);
+        if (buildingCodes.has(room)) return false;
+        // The same room twice over was written by a bug, and there is no
+        // point making someone clear their history by hand to be rid of it.
+        const key = `${building}|${room}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
       });
     } catch {
       return [];
@@ -197,7 +208,14 @@ window.addEventListener("DOMContentLoaded", () => {
       floor: entry.floor ? String(entry.floor) : '',
       room: String(entry.room),
     };
-    const next = [rec, ...readRecents().filter((x) => recentKey(x) !== recentKey(rec))]
+    const existing = readRecents();
+    // Arriving somewhere knows the room but not the floor; opening it knows
+    // both. Whichever happens second should not forget what the first knew.
+    if (!rec.floor) {
+      const known = existing.find((x) => recentKey(x) === recentKey(rec) && x.floor);
+      if (known) rec.floor = known.floor;
+    }
+    const next = [rec, ...existing.filter((x) => recentKey(x) !== recentKey(rec))]
       .slice(0, RECENTS_MAX);
     try { localStorage.setItem(RECENTS_KEY, JSON.stringify(next)); } catch { /* not fatal */ }
   };
@@ -219,36 +237,6 @@ window.addEventListener("DOMContentLoaded", () => {
   // sent to a riser cupboard.
   const isDestinationType = (type) => String(type || 'room').toLowerCase() === 'room';
 
-  // The nearest walking node to a point, so "directions from here" has
-  // somewhere to start. Walking nodes come first because they sit on the
-  // network; a room is only used when a floor has no nodes traced.
-  const nearestNodeRoom = async (building, lngLat) => {
-    if (!building || !lngLat) return null;
-    let graph;
-    try {
-      graph = await getJSON('/data/nav-graph.json');
-    } catch {
-      return null;
-    }
-    // One flat network for the whole campus; a node's building is a label on
-    // it rather than a bucket it lives in.
-    const wanted = building.toUpperCase();
-    const all = graph?.nodes || [];
-    if (!all.length) return null;
-
-    let best = null;
-    let bestD = Infinity;
-    for (const n of all) {
-      if ((n.building || '').toUpperCase() !== wanted) continue;
-      if (!n.room) continue; // an unlabelled node cannot be asked for by name
-      const dx = (n.lng - lngLat.lng) * Math.cos((n.lat * Math.PI) / 180);
-      const dy = n.lat - lngLat.lat;
-      // a walking node beats a room at the same distance
-      const d = dx * dx + dy * dy;
-      if (d < bestD) { bestD = d; best = n; }
-    }
-    return best ? { room: best.room, floor: best.floor } : null;
-  };
 
   function attachSuggest(input) {
     const box = document.createElement("div");
@@ -456,6 +444,23 @@ window.addEventListener("DOMContentLoaded", () => {
   // the basemap was still coming in.
   renderBrowse();
 
+  // Turns what was typed into an end of a route: the text the router should
+  // be given, and the words to put on the card. Null when the box was empty.
+  const endFromText = (raw, fallbackBuilding) => {
+    const ref = parseRoomRef(raw);
+    if (!ref) return null;
+    if (ref.ambiguous) return { ambiguous: ref.ambiguous };
+    const building = ref.building || fallbackBuilding || '';
+    if (ref.room) {
+      return {
+        ref: building ? `${building}-${ref.room}` : ref.room,
+        label: makeRoomLabel(building, '', ref.room),
+        building,
+      };
+    }
+    return { ref: ref.building, label: ref.building, building: ref.building };
+  };
+
   const submitDirections = (event) => {
     event.preventDefault();
     const form = event.target;
@@ -467,107 +472,99 @@ window.addEventListener("DOMContentLoaded", () => {
     };
     if (errEl) errEl.hidden = true;
 
-    const from = parseRoomRef(form.from.value);
-    const to = parseRoomRef(form.to.value);
-    if (!to) {
-      showError('Enter a room or a building to go to.');
+    const fromRef = parseRoomRef(form.from.value);
+    const toRef = parseRoomRef(form.to.value);
+    if (!toRef) {
+      showError('Enter a room, a building or a car park to go to.');
       return false;
     }
-    for (const ref of [from, to]) {
+    for (const ref of [fromRef, toRef]) {
       if (ref?.ambiguous) {
         showError(`More than one room is called ${ref.ambiguous}. `
           + 'Pick the one you mean from the list.');
         return false;
       }
     }
-    if (!from) {
-      // No start given means "from where I am": the nearest point on the
-      // walking network is a better answer than refusing to route.
-      startFromNearest(to);
+    // A bare room number takes its building from the other box, so
+    // "SW3-1600" to "1990" still means two rooms in SW3. A car park cannot
+    // stand in for it: there are no room numbers out there, and "LOT A" to
+    // "1750" was being read as room 1750 of Lot A and refused as unmapped
+    // rather than as the question it is.
+    const isLot = (code) => placeKinds.get(String(code || '').toUpperCase()) === 'parking';
+    const named = [fromRef?.building, toRef.building].filter(Boolean);
+    const fallback = named.find((code) => !isLot(code)) || '';
+    if (!fallback && ((fromRef && !fromRef.building) || !toRef.building)) {
+      showError('Include the building code on the room, e.g. SW3-1750.');
       return false;
     }
-    const building = from.building || to.building;
-    if (!building) {
+    const to = endFromText(form.to.value, fallback);
+    const from = endFromText(form.from.value, fallback);
+    if (!to.building && !to.ref) {
       showError('Include the building code, e.g. SW3-1600 or just SW3.');
       return false;
     }
-    // Pass each end fully qualified -- "SW3-1990", or just "SW7" for a
-    // building -- so the router can tell a room in this building from a
-    // different building altogether.
-    const refText = (r) => (r.room ? (r.building ? `${r.building}-${r.room}` : r.room) : r.building);
-    const refLabel = (r) => (r.room ? makeRoomLabel(r.building || building, '', r.room) : r.building);
-    routeBetweenRooms(building, refText(from), refText(to),
-      { fromLabel: refLabel(from), toLabel: refLabel(to) });
+    if (!from) {
+      // No start given means "from where I am". Nothing needs typing for
+      // that, so it is not an error -- it is the common case.
+      startRouteTo(to, { onError: showError });
+      return false;
+    }
+    runRoute(from, to);
     return false;
   };
 
-  // "Get Directions" with only a destination: start from the nearest node to
-  // wherever the user is, falling back to the middle of the view when the
-  // browser has not given us a location.
-  const startFromNearest = async (to) => {
-    const errEl = document.getElementById('browse-directions-error');
-    const building = to.building;
-    if (!building) {
-      if (errEl) {
-        errEl.textContent = 'Include the building code on the room, e.g. SW3-1990.';
-        errEl.hidden = false;
-      }
+  /**
+   * Go somewhere, starting from wherever the user already is.
+   *
+   * Every "Directions" button ends up here: on a room, on a building, on a
+   * car park. The start is whatever they have already said it is -- a place
+   * they pressed "Start Here" on -- and otherwise where their browser says
+   * they are, asked for at the moment they ask for directions, which is the
+   * moment the permission prompt makes sense to them.
+   */
+  const startRouteTo = async (to, { onError } = {}) => {
+    if (!to) return;
+
+    if (customStart) {
+      runRoute(customStart, to);
       return;
     }
-    // A start the user placed themselves wins; otherwise this is "from where
-    // I am", so ask the browser rather than guessing from the viewport. The
-    // map centre is the last resort, and says so.
-    let here = customStartLocation;
-    let label = customStartLabel || 'Selected Point';
-    if (!here) {
-      if (errEl) {
-        errEl.textContent = 'Finding Your Location…';
-        errEl.hidden = false;
-      }
-      here = await requestUserLocation();
-      label = 'Your Location';
-    }
-    if (!here) {
-      here = { lng: map.getCenter().lng, lat: map.getCenter().lat };
-      label = 'Nearest Point';
-    }
-    if (errEl) errEl.hidden = true;
 
-    const near = await nearestNodeRoom(building, here);
-    if (!near) {
-      if (errEl) {
-        errEl.textContent = `No walking network mapped for ${building} yet.`;
-        errEl.hidden = false;
-      }
+    renderDirectionsCard({
+      fromLabel: 'Finding your location…', toLabel: to.label,
+    });
+    const here = await requestUserLocation();
+    if (here) {
+      runRoute({ lng: here.lng, lat: here.lat, label: 'Your Location' }, to);
       return;
     }
-    const form = document.querySelector('.browse-directions');
-    if (form) form.from.value = `${building}-${near.room}`;
-    routeBetweenRooms(building, near.room, to.room,
-      { fromLabel: `${label} · ${near.room}` });
-  };
 
-  // "Directions" on a building card: route to the building itself, from
-  // wherever the user is. Which room they end up nearest is the router's
-  // business -- the point is getting to the building.
-  const routeToBuilding = async (code) => {
-    const b = String(code || '').trim().toUpperCase();
-    if (!b) return;
-    // There is no outdoor network yet, so a route to a building can only be
-    // worked out from somewhere already on the network. Rather than guess at
-    // a start and produce a route from nowhere, this opens the directions
-    // form with the destination filled in and the cursor in the start box.
-    clearNavigation();
+    // No fix -- refused, indoors, no sensor. There is nothing to guess at, so
+    // ask. The message goes into the form's own error line rather than onto a
+    // card of its own: "say where you are starting from" is only useful next
+    // to the box you would say it in.
+    const message = `Going to ${to.label}. Turn on location, or say where you `
+      + 'are starting from.';
+    if (onError) return onError(message);
     await renderBrowse();
     const form = document.querySelector('.browse-directions');
-    if (!form) return;
-    form.to.value = b;
-    form.from.focus();
+    if (form) {
+      form.to.value = to.ref || to.label || '';
+      form.from.focus();
+    }
     const errEl = document.getElementById('browse-directions-error');
     if (errEl) {
-      errEl.textContent = `Going to ${b}. Where are you starting from?`;
+      errEl.textContent = message;
       errEl.hidden = false;
     }
+  };
+
+  // "Directions" on a building or car park card: the place itself is the
+  // destination, and which way in you end up at is the router's business.
+  const routeToBuilding = (code) => {
+    const b = String(code || '').trim();
+    if (!b) return;
+    startRouteTo({ ref: b, label: b, building: b.toUpperCase() });
   };
 
   const getJSON = async (url) => {
@@ -699,19 +696,29 @@ window.addEventListener("DOMContentLoaded", () => {
     `;
   };
 
-  let navActive = false;
   let startMarker = null;
   let endMarker = null;
-  let customStartLocation = null;
-  let customStartLabel = null;
+  // Where a route starts, when the user has said so rather than leaving it to
+  // their phone. One object, because both ends of a route are the same kind
+  // of thing: { ref, lng, lat, label, building }. `ref` is a name the router
+  // knows ("SW3-1650", "LOT Q") when there is one, and the point is what
+  // stands in for it when there is not.
+  let customStart = null;
   let customStartMarker = null;
+
+  // Hand-calibrated floor sheets store a room as "SW3-1602" and generated
+  // ones store "1602". Either way the room is 1602.
+  const bareRoom = (building, room) => {
+    const b = String(building || '').trim();
+    const r = String(room || '').trim();
+    return b && r.toUpperCase().startsWith(`${b.toUpperCase()}-`)
+      ? r.slice(b.length + 1) : r;
+  };
 
   function makeRoomLabel(building, floor, room) {
     const b = String(building || '').trim();
     const f = String(floor || '').trim();
-    const r = String(room || '').trim();
-    let pureRoom = r;
-    if (b && r.startsWith(b + '-')) pureRoom = r.slice(b.length + 1);
+    const pureRoom = bareRoom(b, room);
     if (b && pureRoom) return `${b} · ${pureRoom}`;
     if (b && f) return `${b} · Floor ${f}`;
     if (b) return b;
@@ -721,7 +728,23 @@ window.addEventListener("DOMContentLoaded", () => {
 
   // Renders the sidebar's directions view: endpoints, and once the route is
   // back, distance + a room-by-room step list (grouped by floor).
-  const renderDirectionsCard = ({ fromLabel, toLabel, path, distanceM, message }) => {
+  // The directions last drawn, so they can be gone back to. Looking at a room
+  // along the way should not mean asking for the route a second time.
+  let lastDirections = null;
+
+  const renderDirectionsCard = (card) => {
+    lastDirections = card;
+    drawDirectionsCard(card);
+  };
+
+  /** Put the directions back up, if there are any. */
+  const showLastDirections = () => {
+    if (!lastDirections) return false;
+    drawDirectionsCard(lastDirections);
+    return true;
+  };
+
+  const drawDirectionsCard = ({ fromLabel, toLabel, path, distanceM, message }) => {
     // Every point on a route is a walking node standing IN some space, so
     // listing the points named the corridor you are walking along as though
     // it were a place to go: "1600", then "continue along the corridor",
@@ -751,7 +774,14 @@ window.addEventListener("DOMContentLoaded", () => {
       // add up to the total rather than losing every transition.
       const legs = [];
       path.forEach((p, i) => {
-        const gap = i > 0 ? metresBetween(path[i - 1], p) : 0;
+        const prev = i > 0 ? path[i - 1] : null;
+        const gap = prev ? metresBetween(prev, p) : 0;
+        // The hop off an anchor -- a car park, wherever the phone put you --
+        // is not a walk along anything: there is no mapped path under it. It
+        // is kept apart so it can be said as its own step rather than adding
+        // four hundred metres to "follow the path outside", which is a path
+        // that does not go there.
+        const offAnchor = Boolean(prev && prev.kind === 'anchor');
         const space = p.room || null;
         const last = legs[legs.length - 1];
         // A leg is a space, on a floor, in a building. Crossing from one
@@ -762,14 +792,23 @@ window.addEventListener("DOMContentLoaded", () => {
         // treating it as one broke a single walk down one hallway into four
         // steps that each said "follow the hallway".
         const sameFloor = last && (last.floor === p.floor || !last.floor || !p.floor);
-        if (last && last.space === space && sameFloor
+        // An anchor is a car park, or wherever the phone says you are: it is
+        // not on the network, and the walk from it to the nearest path is its
+        // own step. Without this it merged into the outdoor stretch that
+        // follows and the name of the place you started from was lost.
+        const sameKind = last && last.kind === (p.kind || null);
+        if (last && last.space === space && sameFloor && sameKind
           && last.building === (p.building || null)) {
           last.metres += gap;
           last.floor = last.floor || p.floor;
           last.end = p;
         } else {
           legs.push({
-            space, name: p.name || null, floor: p.floor, metres: gap,
+            space, name: p.name || null, floor: p.floor,
+            // the walk to or from an anchor is an approach, never a leg's own
+            // distance, or it would be counted in both
+            metres: (offAnchor || p.kind === 'anchor') ? 0 : gap,
+            approach: (offAnchor || p.kind === 'anchor') ? gap : 0,
             building: p.building || null,
             // p.type is what the node is; p.space is what it stands in, and a
             // walking node in a stairwell is typed as a corridor either way
@@ -809,10 +848,16 @@ window.addEventListener("DOMContentLoaded", () => {
         if (leg.space && leg.name) return `${leg.space} (${leg.name})`;
         if (leg.space) return leg.space;
         if (leg.name) return leg.name;
+        // an anchor with nothing to call it: where the phone put you
+        if (leg.kind === 'anchor') return 'where you are';
         if (leg.type === 'stairs') return 'the stairs';
         if (leg.type === 'elevator') return 'the lift';
         // Outside there are no room numbers at all.
         if (!leg.building) return 'the path outside';
+        // A node in a place but on no floor is outdoors in it -- the path at
+        // a building's door, or a car park, which has no hallways. "Start at
+        // the hallway" was what a route out of Lot F opened with.
+        if (!leg.floor) return leg.building;
         // Inside one, an unnamed stretch is a hallway. The building's own
         // name is the answer only when the building is where you are going --
         // "follow SW3 for 6 m" is not something anyone would say.
@@ -826,6 +871,16 @@ window.addEventListener("DOMContentLoaded", () => {
       let lastZone = null;
       let lastBuilding = null;
       legs.forEach((leg, i) => {
+        const isLast = i === legs.length - 1;
+        // Getting between somewhere unmapped and the network is a step of its
+        // own: "head 456 m to the mapped paths" is the truth, where "follow
+        // the path outside for 456 m" names a path that does not reach there.
+        const approach = Math.round(leg.approach || 0);
+        // That walk happens before you get where it takes you, so it goes
+        // above the heading for that place rather than under it.
+        if (approach >= 1 && i > 0 && leg.kind !== 'anchor') {
+          push(`Head ${approach} m to the mapped paths`);
+        }
         const zone = !leg.building ? 'Outside'
           : leg.floor ? `${leg.building} · Floor ${leg.floor}`
             : leg.building === lastBuilding ? lastZone   // still inside it
@@ -835,9 +890,9 @@ window.addEventListener("DOMContentLoaded", () => {
           lastZone = zone;
         }
         if (leg.building) lastBuilding = leg.building;
-        const isLast = i === legs.length - 1;
         if (i === 0) {
           push(`Start at ${named(leg)}`);
+          if (approach >= 1) push(`Head ${approach} m to the mapped paths`);
           // You can walk a long way before reaching anything worth naming --
           // 52 m along the corridor you started in was being left out of the
           // steps entirely.
@@ -846,6 +901,11 @@ window.addEventListener("DOMContentLoaded", () => {
           return;
         }
         if (isLast) {
+          // the last hop off the network is a walk to the destination itself,
+          // not to "the mapped paths" you are already standing on
+          if (approach >= 1 && leg.kind === 'anchor') {
+            push(`Head ${approach} m to ${named(leg, true)}`);
+          }
           push(`Arrive at ${named(leg, true)}`);
           return;
         }
@@ -884,7 +944,7 @@ window.addEventListener("DOMContentLoaded", () => {
    * that is not a route.
    */
   const clearRouteOverlay = () => {
-    navActive = false;
+    lastDirections = null;
     if (startMarker) { startMarker.remove(); startMarker = null; }
     if (endMarker) { endMarker.remove(); endMarker = null; }
 
@@ -894,27 +954,97 @@ window.addEventListener("DOMContentLoaded", () => {
 
   const clearNavigation = () => {
     clearRouteOverlay();
+    // The floors on show were opened for the route. Leaving it should leave
+    // them too, or you are left looking at three floor plans stacked on top
+    // of each other with nothing on the panel to say why.
+    if (window.BCITMap && typeof window.BCITMap.clearFloors === 'function') {
+      window.BCITMap.clearFloors();
+    }
     sidebar.reset();
   };
 
-  const clearCustomStart = () => { customStartLocation = null; customStartLabel = null; if (customStartMarker) { customStartMarker.remove(); customStartMarker = null; } };
-  window.addEventListener('keydown', (e) => { if (e.key === 'Escape') clearNavigation(); });
-
-  // const setRouteLine = (startLngLat, endLngLat) => {
-  //   const navSrc = map.getSource('nav-route');
-  //   if (!navSrc) return;
-  //   navSrc.setData({ type: 'FeatureCollection', features: [{ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: [startLngLat, endLngLat] } }] });
-  // };
-
-  const setCustomStartLocation = (lng, lat, label) => {
-    if (typeof lng !== 'number' || typeof lat !== 'number') return;
-    customStartLocation = { lng, lat };
-    customStartLabel = label || 'Selected point';
-    if (customStartMarker) customStartMarker.setLngLat([lng, lat]);
-    else customStartMarker = new mapboxgl.Marker({ color: '#16a34a' }).setLngLat([lng, lat]).addTo(map);
+  /**
+   * Say what the start is, above the panel.
+   *
+   * "Start Here" used to drop a green pin on the map and change nothing else,
+   * so the only sign it had worked was a dot somewhere in the corner of the
+   * view -- and every "Directions" afterwards then quietly ignored it. It has
+   * its own strip because the panel body is replaced whenever you open a room
+   * or step back to a building, and a start you set two clicks ago is still
+   * your start.
+   */
+  const renderStartBanner = () => {
+    const el = document.getElementById('start-banner');
+    if (!el) return;
+    if (!customStart) {
+      el.hidden = true;
+      el.innerHTML = '';
+      return;
+    }
+    el.innerHTML = `
+      <span class="start-banner-text">Starting from <strong>${esc(customStart.label)}</strong></span>
+      <button type="button" class="start-banner-clear">Clear</button>`;
+    el.hidden = false;
+    el.querySelector('.start-banner-clear')
+      .addEventListener('click', () => clearCustomStart());
   };
 
-  const setStartFromRoom = (payload) => { if (!payload) return; const lng = typeof payload.lng === 'number' ? payload.lng : null; const lat = typeof payload.lat === 'number' ? payload.lat : null; if (lng == null || lat == null) return; const label = makeRoomLabel((payload.building || '').trim(), (payload.floor || '').trim(), (payload.room || '').trim()); setCustomStartLocation(lng, lat, label); };
+  const clearCustomStart = () => {
+    customStart = null;
+    if (customStartMarker) { customStartMarker.remove(); customStartMarker = null; }
+    renderStartBanner();
+  };
+  window.addEventListener('keydown', (e) => { if (e.key === 'Escape') clearNavigation(); });
+
+  /** Remember a start, mark it, and say so. */
+  const setCustomStart = (end) => {
+    if (!end) return;
+    const lng = Number(end.lng);
+    const lat = Number(end.lat);
+    const hasPoint = Number.isFinite(lng) && Number.isFinite(lat);
+    // Somewhere with neither a name the router knows nor a position on the
+    // map is not a place anything can be routed from.
+    if (!end.ref && !hasPoint) return;
+    customStart = {
+      ref: end.ref || null,
+      lng: hasPoint ? lng : null,
+      lat: hasPoint ? lat : null,
+      label: end.label || end.ref || 'Selected point',
+      building: end.building || null,
+    };
+    if (hasPoint) {
+      if (customStartMarker) customStartMarker.setLngLat([lng, lat]);
+      else customStartMarker = new mapboxgl.Marker({ color: '#16a34a' }).setLngLat([lng, lat]).addTo(map);
+    } else if (customStartMarker) {
+      customStartMarker.remove();
+      customStartMarker = null;
+    }
+    renderStartBanner();
+  };
+
+  // "Start Here" on a room card. The room's number is what the router should
+  // be given -- it names a node on the network, which the middle of the room
+  // does not -- and the middle of the room is where the pin goes.
+  const setStartFromRoom = (payload) => {
+    if (!payload) return;
+    const building = String(payload.building || '').trim().toUpperCase();
+    const room = bareRoom(building, payload.room);
+    setCustomStart({
+      ref: building && room ? `${building}-${room}` : (building || null),
+      lng: payload.lng,
+      lat: payload.lat,
+      label: makeRoomLabel(building, String(payload.floor || '').trim(), room),
+      building,
+    });
+  };
+
+  // "Start Here" on a building or car park card: the place itself is the
+  // start, and the router picks whichever way out is nearest.
+  const setStartFromPlace = (name) => {
+    const place = String(name || '').trim();
+    if (!place) return;
+    setCustomStart({ ref: place, label: place, building: place.toUpperCase() });
+  };
 
   // Renders an indoor route (an ordered list of {room, floor, lng, lat} from
   // /find-path) as a line on the map, using the same nav-route source the
@@ -932,23 +1062,48 @@ window.addEventListener("DOMContentLoaded", () => {
     // ...but under the stairs and lift icons, which are the one thing that
     // should stay readable when a route runs over them.
     const above = map.getLayer('building-floor-icon') ? 'building-floor-icon' : undefined;
-    for (const id of ['nav-route-casing', 'nav-route-line']) {
+    for (const id of ['nav-route-casing', 'nav-route-line', 'nav-route-approach']) {
       if (map.getLayer(id)) map.moveLayer(id, above);
     }
 
-    // Draw only the walking network. The first and last points of a route are
-    // the rooms themselves, whose position is the middle of the room -- so
-    // including them drew a diagonal from the centre of a room out to the
-    // node serving it, cutting across whatever lay between. The markers show
-    // where the route starts and ends; the line follows the nodes.
     // Every point on a route is a network node -- rooms are labels on nodes,
-    // not places the route passes through -- so there is nothing to filter.
-    const network = path;
-    const coords = (network.length >= 2 ? network : path).map((p) => [p.lng, p.lat]);
-    src.setData({
-      type: 'FeatureCollection',
-      features: [{ type: 'Feature', geometry: { type: 'LineString', coordinates: coords }, properties: {} }],
+    // not places the route passes through -- except the anchors at either
+    // end, which are somewhere nobody has traced a path into: a car park,
+    // wherever the phone put you.
+    //
+    // The hop between an anchor and the network is drawn dashed, because it
+    // is not a route. It is a straight line to where the mapped paths begin,
+    // and drawn solid it read as an instruction to walk through the buildings
+    // it happens to cross.
+    const coords = path.map((p) => [p.lng, p.lat]);
+    const features = [];
+    let run = [];
+    path.forEach((p, i) => {
+      run.push(coords[i]);
+      const next = path[i + 1];
+      const hop = p.kind === 'anchor' || (next && next.kind === 'anchor');
+      if (!next) return;
+      if (hop) {
+        if (run.length > 1) {
+          features.push({
+            type: 'Feature', properties: { approach: 0 },
+            geometry: { type: 'LineString', coordinates: run },
+          });
+        }
+        features.push({
+          type: 'Feature', properties: { approach: 1 },
+          geometry: { type: 'LineString', coordinates: [coords[i], coords[i + 1]] },
+        });
+        run = [coords[i + 1]];
+      }
     });
+    if (run.length > 1) {
+      features.push({
+        type: 'Feature', properties: { approach: 0 },
+        geometry: { type: 'LineString', coordinates: run },
+      });
+    }
+    src.setData({ type: 'FeatureCollection', features });
     if (!fit) return;
     // A route asked for by name (the directions form, or a shared link) has
     // no click to have moved the map first, so frame it here.
@@ -960,39 +1115,76 @@ window.addEventListener("DOMContentLoaded", () => {
   };
 
   /**
-   * Route between two rooms named by number, with no prior map interaction.
-   * Backs the sidebar's directions form, the /map?from=&to= deep link and
-   * the Route Finder page's hand-off, so all three behave identically.
+   * Draw the route between two ends, whatever kind of thing each end is.
+   *
+   * An end is { ref, lng, lat, label }: a name the router knows when there is
+   * one, a point on the map otherwise. The two are interchangeable on purpose
+   * -- that is what makes "Start Here" on a car park, "Directions" on a room
+   * across campus, and typing both into the form the same operation instead
+   * of three that behave differently.
    */
-  const routeBetweenRooms = async (building, fromRoom, toRoom, opts = {}) => {
-    const b = (building || '').trim().toUpperCase();
-    const from = (fromRoom || '').trim();
-    const to = (toRoom || '').trim();
-    if (!b || !from || !to) return;
+  const runRoute = async (from, to, { fit = true } = {}) => {
+    if (!from || !to) return false;
+    // A name beats a point: it names a node on the network, where a point has
+    // to be snapped to the nearest one.
+    const asRef = (end) => (end.ref
+      ? end.ref
+      : { lng: end.lng, lat: end.lat, label: end.label || null });
+    if (!from.ref && !Number.isFinite(Number(from.lng))) return false;
+    if (!to.ref && !Number.isFinite(Number(to.lng))) return false;
 
     clearNavigation();
-    navActive = true;
-    // A start the user did not type is theirs, not a room number they have to
-    // recognise, so the caller can say what to call it.
-    const fromLabel = opts.fromLabel || makeRoomLabel(b, '', from);
-    const toLabel = opts.toLabel || makeRoomLabel(b, '', to);
+    const fromLabel = from.label || from.ref || 'Your Location';
+    const toLabel = to.label || to.ref || 'Destination';
     renderDirectionsCard({ fromLabel, toLabel });
-    const routed = await requestAndOverlayIndoorPath(
-      b, from, b, to, fromLabel, toLabel, { fit: true });
+
+    const routed = await requestAndOverlayIndoorPath({
+      building: to.building || from.building || '',
+      startRoom: asRef(from),
+      goalRoom: asRef(to),
+      fromLabel,
+      toLabel,
+      fit,
+    });
 
     // Only somewhere you actually got to is worth remembering. Recording the
     // destination whatever happened filled the Recent list with the typos and
     // dead ends of every failed attempt.
-    if (routed) {
-      // `to` may be fully qualified ("SW3-1750") or a building on its own
-      // ("SW7"), so it is split before being remembered.
-      const toRef = parseRoomRef(to);
-      if (toRef?.room) rememberRoom({ building: toRef.building || b, room: toRef.room });
+    if (routed && typeof asRef(to) === 'string') {
+      const toRef = parseRoomRef(to.ref);
+      const building = toRef?.building || to.building;
+      // the floor is the one the route ended on, when that is the building
+      // being remembered -- a room's floor is not always the first one
+      const floor = routed.building === building ? routed.floor : '';
+      if (toRef?.room) rememberRoom({ building, room: toRef.room, floor });
     }
+    return Boolean(routed);
+  };
+
+  /**
+   * Route between two rooms named by number, with no prior map interaction.
+   * Backs the /map?from=&to= deep link and the schedule page's hand-off, so
+   * both behave the same as typing the two into the directions form.
+   */
+  const routeBetweenRooms = (building, fromRoom, toRoom, opts = {}) => {
+    const b = (building || '').trim().toUpperCase();
+    const from = (fromRoom || '').trim();
+    const to = (toRoom || '').trim();
+    if (!from || !to) return;
+    const end = (text, label) => {
+      const parsed = parseRoomRef(text) || {};
+      const code = parsed.building || b;
+      return {
+        ref: parsed.room ? (code ? `${code}-${parsed.room}` : parsed.room) : (code || text),
+        label: label || (parsed.room ? makeRoomLabel(code, '', parsed.room) : (code || text)),
+        building: code,
+      };
+    };
+    return runRoute(end(from, opts.fromLabel), end(to, opts.toLabel));
   };
 
   /** Draws a route, and says whether there was one. */
-  async function requestAndOverlayIndoorPath(startBuildingCode, startRoomOrEntrance, goalBuildingCode, goalRoom, fromLabel, toLabel, { fit = false } = {}) {
+  async function requestAndOverlayIndoorPath({ building, startRoom, goalRoom, fromLabel, toLabel, fit = false }) {
     if (isOverlayingIndoor) {
       console.log('[INDOOR] overlay in progress, skipping');
       return false;
@@ -1000,33 +1192,69 @@ window.addEventListener("DOMContentLoaded", () => {
     isOverlayingIndoor = true;
     try {
       const payload = {
-        building: goalBuildingCode.toUpperCase(),
-        startRoom: startRoomOrEntrance,
+        building: String(building || '').toUpperCase(),
+        startRoom,
         goalRoom,
       };
       const response = await fetch('/find-path', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       const result = await response.json().catch(() => null);
       if (!response.ok || !result || !result.success) {
         console.warn('[INDOOR PATH]', result?.message || response.statusText);
-        renderDirectionsCard({ fromLabel, toLabel, message: result?.message || 'Indoor route not available for this building yet.' });
+        renderDirectionsCard({ fromLabel, toLabel, message: result?.message || 'No route to there yet.' });
         return false;
       }
 
-      // Awaited, not fired off: focusRoom draws the building card into the
-      // same sidebar, and since it now waits on the room index it finishes
-      // AFTER this function would otherwise have drawn the directions --
-      // wiping the route out from under the user and leaving them looking at
-      // a plain building card they did not ask for.
-      const goalFloor = result.path[result.path.length - 1]?.floor || '1';
-      if (window.BCITMap && typeof window.BCITMap.focusRoom === 'function') {
-        await window.BCITMap.focusRoom({
-          building: goalBuildingCode.toUpperCase(), floor: goalFloor,
-        });
+      // Every floor the route runs through, in the order it meets them.
+      //
+      // Only the building the route ENDED in used to be opened, so a walk
+      // from SW3-1750 to SW5-2895 drew SW5's rooms and left SW3 a plain blue
+      // block -- and "Start at 1750 (Lecture Hall)" named a room you could
+      // not see. A route is a thing that passes through buildings; all of
+      // them are worth being able to see inside.
+      //
+      // Read off the route rather than the request: a route can end in a
+      // different building from the one asked for, and it can end outdoors,
+      // at a car park with no floors at all.
+      // One floor per building, and not more: two floors of the same building
+      // drawn together sit exactly on top of each other, and in SW5 that
+      // buried the room being routed to under the lecture hall of the floor
+      // below. The one shown is the floor the route spends the most of itself
+      // on in that building -- which is the floor you are walking -- and the
+      // later floor wins a tie, because that is the one you end on.
+      const byBuilding = new Map();
+      result.path.forEach((p, i) => {
+        if (p.kind === 'anchor' || !p.building || !p.floor) return;
+        const floors = byBuilding.get(p.building) || new Map();
+        const floor = String(p.floor);
+        const seen = floors.get(floor) || { floor, points: 0, last: -1 };
+        seen.points += 1;
+        seen.last = i;
+        floors.set(floor, seen);
+        byBuilding.set(p.building, floors);
+      });
+      const sheets = [];
+      for (const [building, floors] of byBuilding) {
+        const best = [...floors.values()]
+          .sort((a, b) => b.points - a.points || b.last - a.last)[0];
+        sheets.push({ building, floor: best.floor, at: best.last });
+      }
+      // in the order the route meets them, so the last one drawn is the one
+      // it arrives on
+      sheets.sort((a, b) => a.at - b.at);
+      // Awaited, not fired off: this draws into the same map and sidebar, and
+      // since it waits on the sheets it finishes AFTER this function would
+      // otherwise have drawn the directions -- wiping the route out from
+      // under the user.
+      if (window.BCITMap && typeof window.BCITMap.showRouteFloors === 'function') {
+        await window.BCITMap.showRouteFloors(sheets);
       }
 
       renderIndoorPath(result.path, { fit });
       renderDirectionsCard({ fromLabel, toLabel, path: result.path, distanceM: result.distanceM });
-      return true;
+      // The last sheet the route touched, so the caller can record the floor
+      // it arrived on: a room remembered without one was listed as "Floor 1"
+      // whichever floor it was actually on.
+      return sheets.length ? sheets[sheets.length - 1] : true;
     } catch (error) {
       console.error('[INDOOR PATH ERROR]:', error);
       renderDirectionsCard({ fromLabel, toLabel, message: 'Something went wrong finding that route.' });
@@ -1037,34 +1265,27 @@ window.addEventListener("DOMContentLoaded", () => {
   }
 
 
-  // "Directions" on a room card. The outdoor leg used to be a separate
-  // proof-of-concept graph of hand-entered campus nodes, which drew its own
-  // blue line across the map and handed off to an entrance; the route people
-  // actually want is the indoor one, from wherever they are standing to the
-  // room, so this now asks the same router the directions form does.
-  const navigateToRoom = async (payload) => {
+  // "Directions" on a room card: take me to this room from wherever I am, or
+  // from wherever I said "Start Here".
+  //
+  // This used to throw the start away and begin instead at the node nearest
+  // the destination WITHIN the destination's own building -- so "Start Here"
+  // in SW3-1650, then "Directions" to SW5-1840, gave a route from SW5-1800,
+  // a few metres from the room, and called it "SW3 \u00b7 1650 \u00b7 1800". The graph
+  // covers the whole campus now, so the start is simply the start.
+  const navigateToRoom = (payload) => {
     if (!payload) return;
     const b = (payload.building || '').trim().toUpperCase();
-    const r = (payload.room || '').trim();
+    const r = bareRoom(b, payload.room);
     if (!b || !r) {
       console.warn('[BCIT MAP] navigateToRoom needs a building and a room.');
       return;
     }
-
-    // "Start Here" on another room card sets a start inside this building,
-    // and that is a room number the router can use directly.
-    const startedInside = customStartLabel
-      && customStartLabel.toUpperCase().startsWith(b);
-    if (startedInside) {
-      const parts = customStartLabel.split(' \u00b7 ');
-      const startRoom = parts.length > 1 ? parts[parts.length - 1] : null;
-      if (startRoom && startRoom !== r) {
-        routeBetweenRooms(b, startRoom, r, { fromLabel: customStartLabel });
-        return;
-      }
-    }
-
-    startFromNearest({ building: b, room: r });
+    startRouteTo({
+      ref: `${b}-${r}`,
+      label: makeRoomLabel(b, String(payload.floor || '').trim(), r),
+      building: b,
+    });
   };
 
   const app = initializeApp(window.firebaseConfig);
@@ -1217,12 +1438,16 @@ window.addEventListener("DOMContentLoaded", () => {
     clearNavigation,
     clearRouteOverlay,
     geolocateControl: geoControl,
-    setCustomStartLocation,
     clearCustomStart,
     setStartFromRoom,
+    setStartFromPlace,
+    showLastDirections,
+    // whether a route is on the map, so a card's Back knows where back is
+    hasRoute: () => Boolean(lastDirections),
     toggleFavoriteRoom,
     routeBetweenRooms,
     routeToBuilding,
+    startRouteTo,
     submitDirections,
     rememberRoom,
     clearRecents,
@@ -1304,14 +1529,29 @@ window.addEventListener("DOMContentLoaded", () => {
               <div class="place-sub">Parking${p.stalls ? ` · ${esc(p.stalls)} stalls` : ''}</div>
               ${kinds.length ? `<div class="place-name">${esc(kinds.join(' · '))}</div>` : ''}
               <div class="place-actions">
-                <!-- the handler is attached below rather than written inline:
-                     a name with an apostrophe in it would end the string -->
+                <!-- the handlers are attached below rather than written
+                     inline: a name with an apostrophe in it would end the
+                     string. "Start Here" is the half of this that matters --
+                     a car park is somewhere you arrive, park, and walk from,
+                     so it is far more often the start of a route than the
+                     end of one, and there was no way to say so. -->
                 <button type="button" class="btn-primary" id="parking-directions">Directions</button>
+                <button type="button" class="btn-secondary" id="parking-start">Start Here</button>
               </div>
               ${p.hours ? `<p class="sidebar-hint">${esc(p.hours)}</p>` : ''}
             </div>`);
           const go = document.getElementById('parking-directions');
           if (go) go.addEventListener('click', () => routeToBuilding(name));
+          const start = document.getElementById('parking-start');
+          if (start) {
+            start.addEventListener('click', () => {
+              setStartFromPlace(name);
+              // Saying "start here" and being left on the same card gives no
+              // sign of what to do next; the browse panel is where the other
+              // end gets chosen, and the start now rides above it.
+              renderBrowse();
+            });
+          }
         });
 
         map.addLayer({
@@ -1346,6 +1586,37 @@ window.addEventListener("DOMContentLoaded", () => {
       map.addLayer({ id: 'buildings-fill', type: 'fill', source: 'buildings', paint: { 'fill-color': '#93c5fd', 'fill-opacity': 0.35 } });
       map.addLayer({ id: 'buildings-line', type: 'line', source: 'buildings', paint: { 'line-color': '#2563eb', 'line-width': 1.2 } });
 
+      // Say which building is which.
+      //
+      // The car parks have been labelled since they were added and the
+      // buildings never were, so campus read as a field of identical blue
+      // shapes: you could search SW3 by name, or click a shape to find out
+      // what it was, but you could not look at the map and see where SW3 is.
+      //
+      // The code is the label, because the code is what a room number, a
+      // timetable and everyone on campus uses. The longer name goes
+      // underneath once you are close enough for it to fit.
+      map.addLayer({
+        id: 'buildings-label', type: 'symbol', source: 'buildings',
+        // Four outlines have no name. Everything goes through to-string so a
+        // missing name is an empty string rather than a null the expression
+        // has to be typed around.
+        filter: ['!=', ['to-string', ['get', 'BuildingName']], ''],
+        layout: {
+          'text-field': ['to-string', ['get', 'BuildingName']],
+          'text-size': ['interpolate', ['linear'], ['zoom'], 14, 10, 16, 12, 19, 16],
+          // a label belongs to its own outline, and should not spill across
+          // the one next door
+          'text-max-width': 9,
+          'text-padding': 2,
+        },
+        paint: {
+          'text-color': '#1e40af',
+          'text-halo-color': '#ffffff',
+          'text-halo-width': 1.4,
+        },
+      });
+
       map.on('mouseenter', 'buildings-fill', () => map.getCanvas().style.cursor = 'pointer');
       map.on('mouseleave', 'buildings-fill', () => map.getCanvas().style.cursor = '');
 
@@ -1361,8 +1632,10 @@ window.addEventListener("DOMContentLoaded", () => {
         // A route drawn as one thin line disappeared against the floor plan.
         // A dark casing under a bright core is how a route reads on any
         // background, and it thickens as you zoom in rather than staying hairline.
+        const onNetwork = ['!=', ['get', 'approach'], 1];
         map.addLayer({
           id: 'nav-route-casing', type: 'line', source: 'nav-route',
+          filter: onNetwork,
           layout: { 'line-cap': 'round', 'line-join': 'round' },
           paint: {
             'line-color': '#0b3d91',
@@ -1372,10 +1645,27 @@ window.addEventListener("DOMContentLoaded", () => {
         });
         map.addLayer({
           id: 'nav-route-line', type: 'line', source: 'nav-route',
+          filter: onNetwork,
           layout: { 'line-cap': 'round', 'line-join': 'round' },
           paint: {
             'line-color': '#38bdf8',
             'line-width': ['interpolate', ['linear'], ['zoom'], 15, 3, 20, 8],
+          },
+        });
+        // The walk between somewhere unmapped -- a car park, wherever the
+        // phone put you -- and the nearest mapped path. Dashed, because it is
+        // a direction rather than a route: nobody has traced what is under
+        // it, and drawn solid it read as an instruction to walk through
+        // whatever buildings the straight line crosses.
+        map.addLayer({
+          id: 'nav-route-approach', type: 'line', source: 'nav-route',
+          filter: ['==', ['get', 'approach'], 1],
+          layout: { 'line-cap': 'butt', 'line-join': 'round' },
+          paint: {
+            'line-color': '#0b3d91',
+            'line-width': ['interpolate', ['linear'], ['zoom'], 15, 2.5, 20, 6],
+            'line-opacity': 0.75,
+            'line-dasharray': [1.4, 1.6],
           },
         });
       }
@@ -1446,14 +1736,14 @@ window.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  map.on('click', (e) => {
-    if (!navActive) return;
-
-    // Query features in the layer that displays the calculated outdoor/indoor route
-    const features = map.queryRenderedFeatures(e.point, { layers: ['nav-route-line'] });
-    if (features && features.length > 0) return; // clicked on the route itself
-
-    clearNavigation();
-  });
+  // A route used to be dismissed by clicking anywhere that was not the route
+  // itself -- so a click to look at a room, or one that missed a building by
+  // ten pixels, threw away directions that took a moment to ask for and gave
+  // no sign of what had happened.
+  //
+  // Directions are now a place you are in, and you leave it deliberately:
+  // "Back" on the card, or Escape. A click on the map is free to open
+  // whatever it lands on, and the route stays drawn underneath -- looking at
+  // a room along the way is part of following a route, not abandoning one.
 
 });

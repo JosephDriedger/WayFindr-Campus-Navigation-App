@@ -35,10 +35,47 @@ describe("indoorGraph.findIndoorPath", () => {
     expect(findIndoorPath(undefined, "1", "2").success).toBe(false);
   });
 
-  it("reports no data for a building that has none", () => {
+  it("says which ends are not on the network, rather than which building", () => {
+    // The building being looked at is only a fallback for a bare room number
+    // now -- refusing on it up front turned away every route that started
+    // somewhere untraced, a car park included.
     const res = findIndoorPath("NOT_A_BUILDING", "1", "2");
     expect(res.success).toBe(false);
-    expect(res.message).toMatch(/no indoor map data/i);
+    expect(res.message).toMatch(/no walking node/i);
+    expect(res.message).toContain("1");
+    expect(res.message).toContain("2");
+  });
+
+  withNetwork("routes from a car park nobody has traced a path into", () => {
+    // LOT Q has an outline on the map and no nodes in it. The middle of the
+    // outline snaps to the nearest node, and the walk in from there is drawn
+    // rather than pretended away.
+    const pick = pickBuilding();
+    const res = findIndoorPath(pick.building, "LOT Q", pick.rooms[0]);
+    expect(res.success).toBe(true);
+    expect(res.distanceM).toBeGreaterThan(0);
+    // the route begins at the lot itself, not at whatever node it snapped to
+    expect(res.path[0].kind).toBe("anchor");
+    expect(res.path[0].name).toBe("LOT Q");
+  });
+
+  withNetwork("takes a { lng, lat } as an end of a route", () => {
+    const pick = pickBuilding();
+    const somewhere = { lng: -123.009, lat: 49.253, label: "Your Location" };
+    const res = findIndoorPath(pick.building, somewhere, pick.rooms[0]);
+    expect(res.success).toBe(true);
+    expect(res.path[0].kind).toBe("anchor");
+    expect(res.path[0].name).toBe("Your Location");
+    expect(res.path[res.path.length - 1].kind).not.toBe("anchor");
+  });
+
+  withNetwork("routes across buildings", () => {
+    const res = findIndoorPath("SW3", "SW3-1602", "SW5-1840");
+    expect(res.success).toBe(true);
+    expect(res.distanceM).toBeGreaterThan(0);
+    const buildings = new Set(res.path.map((p) => p.building).filter(Boolean));
+    expect(buildings.has("SW3")).toBe(true);
+    expect(buildings.has("SW5")).toBe(true);
   });
 
   withNetwork("routes between two rooms the network serves", () => {

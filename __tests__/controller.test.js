@@ -71,7 +71,11 @@ describe("Path Request Handler (handlePathRequest)", () => {
         expect(findIndoorPath).not.toHaveBeenCalled();
     });
 
-    test("rejects cross-building requests without calling findIndoorPath", async () => {
+    test("routes across buildings rather than refusing", async () => {
+        // One graph covers the whole campus, so SW3 to SW5 is a longer walk
+        // and not a special case. This used to be turned away here.
+        findIndoorPath.mockReturnValue({ success: true, path: mockPath, distanceM: 120 });
+
         const res = await request(app)
             .post("/find-path")
             .send({
@@ -82,7 +86,33 @@ describe("Path Request Handler (handlePathRequest)", () => {
             });
 
         expect(res.status).toBe(200);
-        expect(res.body.success).toBe(false);
+        expect(res.body.success).toBe(true);
+        expect(findIndoorPath).toHaveBeenCalledWith("SW5", "1615", "1845");
+    });
+
+    test("passes a { lng, lat } end through as a point", async () => {
+        // "Start Here" on a car park, or the phone's own fix: a spot on the
+        // map is an ordinary end of a route, not a room name to be invented.
+        findIndoorPath.mockReturnValue({ success: true, path: mockPath, distanceM: 300 });
+
+        await request(app)
+            .post("/find-path")
+            .send({
+                building: "SW3",
+                startRoom: { lng: -123.003, lat: 49.2542, label: "LOT Q" },
+                goalRoom: "1990",
+            });
+
+        expect(findIndoorPath).toHaveBeenCalledWith(
+            "SW3", { lng: -123.003, lat: 49.2542, label: "LOT Q" }, "1990");
+    });
+
+    test("400s on a point with no usable coordinates", async () => {
+        const res = await request(app)
+            .post("/find-path")
+            .send({ building: "SW3", startRoom: { lng: "nope" }, goalRoom: "1990" });
+
+        expect(res.status).toBe(400);
         expect(findIndoorPath).not.toHaveBeenCalled();
     });
 

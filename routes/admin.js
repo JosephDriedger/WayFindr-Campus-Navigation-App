@@ -19,6 +19,7 @@ import { execFile } from "child_process";
 import { checkSession } from "../middleware/authMiddleware.js";
 import { invalidateCache } from "../services/indoorGraph.js";
 import { applyDelta, featureKey, danglingLinks } from "../services/networkDelta.js";
+import { placeAt } from "../services/places.js";
 
 const router = express.Router();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -223,6 +224,38 @@ function writeNetwork(features, version) {
   return fingerprint(body);
 }
 
+/**
+ * Give every unlabelled node the place it is standing in.
+ *
+ * Which building or car park a node belongs to is a fact about where it is,
+ * not something anybody should have to type -- and it is what makes the place
+ * routable, since "take me to Lot L" means "take me to a node that says Lot
+ * L". The tracer works this out as each node is dropped, but only once the
+ * campus outlines have arrived, and a node placed in the second before that
+ * kept a null forever. Deciding it again here, where the file is written,
+ * means a node inside a lot is mapped to that lot however it got there.
+ *
+ * Only blanks are filled. A node that says which place it is in is taken at
+ * its word: a node at the door of SW7 stands a metre outside SW7's footprint
+ * on purpose, and overwriting that with "outdoors" would unreach the door.
+ *
+ * Returns what it decided, as [{ nid, building }], so the tracer can take the
+ * answer back rather than carrying on from a copy the file disagrees with.
+ */
+function placeNodes(features) {
+  const filled = [];
+  for (const f of features) {
+    const props = f?.properties;
+    if (!props || props.type !== "node" || props.building) continue;
+    const [lng, lat] = f.geometry?.coordinates || [];
+    const place = placeAt(lng, lat);
+    if (!place) continue;
+    props.building = place;
+    filled.push({ nid: props.nid, building: place });
+  }
+  return filled;
+}
+
 /** Nodes, and links, counted. */
 function tally(features) {
   const nodes = features.filter((f) => f.properties?.type === "node").length;
@@ -277,6 +310,8 @@ router.put("/api/network", guard, (req, res) => {
     });
   }
 
+  const placed = placeNodes(fc.features);
+
   const version = current.version + 1;
   let checksum;
   try {
@@ -284,7 +319,7 @@ router.put("/api/network", guard, (req, res) => {
   } catch (err) {
     return res.status(500).json({ error: `Could not save the network: ${err.message}` });
   }
-  res.json({ saved: true, version, checksum, ...tally(fc.features) });
+  res.json({ saved: true, version, checksum, placed, ...tally(fc.features) });
 });
 
 /**
@@ -351,6 +386,8 @@ router.patch("/api/network", guard, (req, res) => {
     });
   }
 
+  const placed = placeNodes(features);
+
   const version = current.version + 1;
   let checksum;
   try {
@@ -363,6 +400,8 @@ router.patch("/api/network", guard, (req, res) => {
     saved: true,
     version,
     checksum,
+    // nodes that were standing in a building or a car park and had not said so
+    placed,
     // what actually happened, which is not always what was asked for
     applied: { added: merged.added, updated: merged.updated, removed: merged.removed },
     ...tally(features),

@@ -5,6 +5,7 @@ import { fileURLToPath } from "url";
 import { checkSession } from "../middleware/authMiddleware.js";
 
 import { handlePathRequest } from "../controllers/pathfinderController.js";
+import { verticalSpacesByFloor } from "../services/indoorGraph.js";
 
 const router = express.Router();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -131,6 +132,24 @@ router.get('/interior', (req, res) => {
 
 // Pathfinding submission
 router.post("/find-path", handlePathRequest);
+
+// Which stairs and lifts each floor of a building can get to.
+//
+// A stairwell is traced once, on whichever sheet somebody drew it on, but it
+// serves every floor it opens onto -- so the map has to be told which floors
+// those are before it can draw them. Answered from the walking network rather
+// than from the drawings: a shaft that nothing links to a floor does not open
+// onto it, whatever it happens to sit above.
+//
+// Small and it changes only when the network is rebuilt, so it is cheap to
+// ask for per building instead of sending the whole graph to the browser.
+router.get("/api/vertical-spaces/:building", (req, res) => {
+  const building = String(req.params.building || "").trim().toUpperCase();
+  if (!/^[A-Z][A-Z0-9]{0,7}$/.test(building)) {
+    return res.status(400).json({ error: "Not a building code." });
+  }
+  res.json({ building, floors: verticalSpacesByFloor(building) });
+});
 
 
 // --- Test Logging Route ---

@@ -9,6 +9,7 @@
     const FLOOR_FILL_LAYER = "building-floor-fill";
     const FLOOR_ICON_LAYER = "building-floor-icon";
     const FLOOR_LINE_LAYER = "building-floor-line";
+    const FLOOR_LABEL_LAYER = "building-floor-label";
 
     const SEL_SRC = "building-selected";
     const SEL_LAYER = "building-selected-line";
@@ -219,6 +220,14 @@
               onclick="window.BCITMap && window.BCITMap.routeToBuilding && window.BCITMap.routeToBuilding('${currentBuildingCode}');">
               Directions
             </button>
+            <!-- A building is as often where you are as where you are going:
+                 "I am in SW3, get me to SW5-1840". Only rooms could say so
+                 before, which meant picking an arbitrary room to stand for
+                 the building you were already in. -->
+            <button type="button" class="btn-secondary"
+              onclick="window.BCITMap && window.BCITMap.setStartFromPlace && window.BCITMap.setStartFromPlace('${currentBuildingCode}');">
+              Start Here
+            </button>
           </div>
           <div class="floor-pills">${buttonsHtml}</div>
           <div class="room-list-header">
@@ -263,15 +272,15 @@
      * Warm means somewhere you can be sent; everything else is cooler and
      * sits back. Beyond that the point is telling them apart at a glance: a
      * stairwell should not have to be read to be recognised. Kept in one
-     * table so the fill, the outline and anything added later cannot drift
-     * apart.
+     * table so the fill, the outline, the label and anything added later
+     * cannot drift apart.
      */
     const SPACE_COLOURS = {
-      room:     { fill: "#fb923c", line: "#b91c1c", opacity: 0.65 },
-      hallway:  { fill: "#cbd5e1", line: "#94a3b8", opacity: 0.5 },
-      service:  { fill: "#a8a29e", line: "#78716c", opacity: 0.45 },
-      stairs:   { fill: "#6ee7b7", line: "#059669", opacity: 0.7 },
-      elevator: { fill: "#c4b5fd", line: "#7c3aed", opacity: 0.7 },
+      room:     { fill: "#fb923c", line: "#b91c1c", opacity: 0.65, label: "#7c2d12" },
+      hallway:  { fill: "#cbd5e1", line: "#94a3b8", opacity: 0.5, label: "#475569" },
+      service:  { fill: "#a8a29e", line: "#78716c", opacity: 0.45, label: "#57534e" },
+      stairs:   { fill: "#6ee7b7", line: "#059669", opacity: 0.7, label: "#065f46" },
+      elevator: { fill: "#c4b5fd", line: "#7c3aed", opacity: 0.7, label: "#5b21b6" },
     };
     const DEFAULT_SPACE = SPACE_COLOURS.room;
 
@@ -398,6 +407,47 @@
           "text-halo-width": 1.4,
         },
       });
+
+      // What each room is, written on it.
+      //
+      // The floor was drawn as coloured shapes and nothing else, so finding
+      // 1650 meant reading down the list in the panel and clicking each one
+      // until the right shape lit up -- and a set of directions saying
+      // "follow 1602 for 19 m" named a space with nothing on it. The number
+      // is the address, so it is the label; the name is what the room IS, and
+      // comes in once you are close enough for it to be worth reading.
+      map.addLayer({
+        id: FLOOR_LABEL_LAYER,
+        type: "symbol",
+        source: FLOOR_SRC,
+        // Below this a room is a few pixels across and its number is a smudge
+        // on it. There are forty of them on a floor, so unlike the handful of
+        // stairwell icons they need a floor under which they do not appear.
+        minzoom: 16,
+        // Stairs, lifts and washrooms already carry a pictogram and their
+        // name. Numbering them here as well would say the same thing twice.
+        filter: ["all", ["has", "label"], ["!", ["has", "icon"]]],
+        layout: {
+          "text-field": [
+            "step", ["zoom"],
+            ["get", "label"],
+            18.5, ["case",
+              ["has", "name"],
+              ["concat", ["get", "label"], "\n", ["get", "name"]],
+              ["get", "label"]],
+          ],
+          "text-size": ["interpolate", ["linear"], ["zoom"], 16, 9, 18, 11, 20, 13],
+          // a name should wrap inside its own room rather than run across the
+          // one next door
+          "text-max-width": 9,
+          "text-padding": 2,
+        },
+        paint: {
+          "text-color": byType("label"),
+          "text-halo-color": "#ffffff",
+          "text-halo-width": 1.5,
+        },
+      });
     }
 
     // Ensure highlight layers exist
@@ -453,6 +503,32 @@
       return sortFloorsBottomFirst(labels);
     }
 
+    // How a building outline names itself, whichever field it happens to use.
+    const BUILDING_NAME = [
+      "coalesce",
+      ["get", "BuildingName"],
+      ["get", "Display_Name"],
+      ["get", "SiteName"],
+    ];
+
+    /**
+     * Take the plain footprints of these buildings off the map.
+     *
+     * A footprint is a solid block; the floor drawn inside it is the thing
+     * worth looking at, and the block over the top of it just dulls the
+     * rooms. Takes a list because a route runs through more than one
+     * building, and each of them has its inside on show.
+     */
+    const hideBuildingShapes = (codes) => {
+      const wanted = codes.map((c) => String(c || "").trim()).filter(Boolean);
+      const filter = wanted.length
+        ? ["!", ["in", BUILDING_NAME, ["literal", wanted]]]
+        : null;
+      for (const layer of ["buildings-fill", "buildings-line"]) {
+        if (map.getLayer(layer)) map.setFilter(layer, filter);
+      }
+    };
+
     const hideBuildingShape = (buildingFeature) => {
       const p = buildingFeature.properties || {};
       const code = (
@@ -462,27 +538,20 @@
         ""
       ).trim();
       if (!code) return;
+      hideBuildingShapes([code]);
+    };
 
-      const filter = [
-        "all",
-        [
-          "!=",
-          [
-            "coalesce",
-            ["get", "BuildingName"],
-            ["get", "Display_Name"],
-            ["get", "SiteName"],
-          ],
-          code,
-        ],
-      ];
-
-      if (map.getLayer("buildings-fill")) {
-        map.setFilter("buildings-fill", filter);
-      }
-      if (map.getLayer("buildings-line")) {
-        map.setFilter("buildings-line", filter);
-      }
+    /** Every polygon on the map that belongs to one of these buildings. */
+    const outlinesFor = (codes) => {
+      const wanted = new Set(codes.map((c) => String(c).toUpperCase()));
+      const src = map.getSource("buildings");
+      const data = src && src._data;
+      return (data?.features || []).filter((ft) => {
+        const p = ft.properties || {};
+        return [p.BuildingName, p.Display_Name, p.SiteName, p.name, p.BldgCode, p.code]
+          .filter(Boolean)
+          .some((s) => wanted.has(String(s).toUpperCase()));
+      });
     };
 
     // Walking nodes and the links between them exist to be routed over, not
@@ -502,6 +571,18 @@
       || ICON_FOR_AMENITY[String(props?.amenity || "").toLowerCase()]
       || null;
 
+    // What to write on a space: its number, which is its address. Hand-
+    // calibrated sheets store it as "SW3-1602" and generated ones as "1602";
+    // the building is written on the building, so the label is the number.
+    const labelFor = (props) => {
+      const room = String(props?.room || "").trim();
+      if (!room) return null;
+      const building = String(props?.building || "").trim();
+      return building && room.toUpperCase().startsWith(`${building.toUpperCase()}-`)
+        ? room.slice(building.length + 1)
+        : room;
+    };
+
     const withoutNetwork = (fc) => ({
       type: "FeatureCollection",
       features: (fc?.features || [])
@@ -510,38 +591,159 @@
           && !NOT_DRAWN.has(String(f.properties?.type || "room").toLowerCase()))
         .map((f) => {
           const icon = iconFor(f.properties);
-          return icon
-            ? { ...f, properties: { ...f.properties, icon } }
-            : f;
+          const label = labelFor(f.properties);
+          if (!icon && !label) return f;
+          return {
+            ...f,
+            properties: {
+              ...f.properties,
+              ...(icon ? { icon } : {}),
+              ...(label ? { label } : {}),
+            },
+          };
         }),
     });
 
-    const showBuildingFloor = async (buildingCode, floorLabel) => {
-      const code = (buildingCode || "").trim();
-      const fl = (floorLabel || "1").trim();
-      if (!code) return;
+    // A sheet is a file on disk that does not change while the page is open,
+    // and a route through three of them would otherwise fetch all three again
+    // every time the destination is nudged. A building nobody has traced has
+    // no sheet, and that is an ordinary state of affairs rather than a fault
+    // -- most of the campus is in it -- so a miss is cached as nothing.
+    const sheetCache = new Map();
 
-      const url = `/data/floor-coordinates/${encodeURIComponent(
-        code
-      )}-Floor${fl}.geojson`;
-
-      try {
-        const data = await getJSON(url);
-        const src = map.getSource(FLOOR_SRC);
-        // The walking network is scaffolding for the router, not part of the
-        // building: drawing its nodes and links put a web of lines across
-        // every room. It is rendered only when a route is being shown.
-        if (src) src.setData(withoutNetwork(data));
-      } catch (err) {
-        // A building nobody has traced yet has no sheet, and that is an
-        // ordinary state of affairs rather than a fault -- most of the campus
-        // is in it. Clear whatever floor was showing and say nothing.
-        const src = map.getSource(FLOOR_SRC);
-        if (src) src.setData({ type: "FeatureCollection", features: [] });
-        if (!/404/.test(String(err && err.message))) {
-          console.error("[BCIT MAP] Failed to load floor coordinates:", url, err);
-        }
+    /** The drawable rooms of one floor, or an empty list if there is no sheet. */
+    const loadSheet = (buildingCode, floorLabel) => {
+      const code = String(buildingCode || "").trim();
+      const fl = String(floorLabel || "1").trim();
+      if (!code) return Promise.resolve([]);
+      const url = `/data/floor-coordinates/${encodeURIComponent(code)}-Floor${fl}.geojson`;
+      if (!sheetCache.has(url)) {
+        sheetCache.set(url, getJSON(url)
+          // The walking network is scaffolding for the router, not part of
+          // the building: drawing its nodes and links put a web of lines
+          // across every room.
+          .then((data) => withoutNetwork(data).features)
+          .catch((err) => {
+            if (!/404/.test(String(err && err.message))) {
+              console.error("[BCIT MAP] Failed to load floor coordinates:", url, err);
+            }
+            return [];
+          }));
       }
+      return sheetCache.get(url);
+    };
+
+    // Which stairs and lifts each floor of a building opens onto, worked out
+    // from the walking network. One request per building, kept for the life
+    // of the page: it changes only when the network is rebuilt.
+    const verticalCache = new Map();
+    const verticalsFor = (buildingCode) => {
+      const code = String(buildingCode || "").trim().toUpperCase();
+      if (!verticalCache.has(code)) {
+        verticalCache.set(code, getJSON(`/api/vertical-spaces/${encodeURIComponent(code)}`)
+          .then((data) => data.floors || {})
+          .catch(() => ({})));   // a floor without its stairs beats no floor
+      }
+      return verticalCache.get(code);
+    };
+
+    /**
+     * One floor, with the stairs and lifts that reach it.
+     *
+     * A stairwell is one shaft through the whole building and it is traced on
+     * one sheet only -- in SW3, floor 1. Floor 2 was therefore drawn with no
+     * stairs on it at all, while the network ran up four of them to get
+     * there: "Take NW Stairs" with nothing on the map to take. The shaft is
+     * in the same place on every floor it opens onto, so the outline traced
+     * downstairs is the right shape to draw here.
+     */
+    const sheetFeatures = async (buildingCode, floorLabel) => {
+      const floor = String(floorLabel || "1").trim();
+      const own = await loadSheet(buildingCode, floor);
+      const byFloor = await verticalsFor(buildingCode);
+      const wanted = byFloor[floor] || [];
+      if (!wanted.length) return own;
+
+      const here = new Set(own.map((f) => String(f.properties?.room || "")));
+      const carried = await Promise.all(wanted.map(async (v) => {
+        if (here.has(String(v.room))) return null;   // traced on this floor too
+        const source = await loadSheet(buildingCode, v.floor);
+        const shape = source.find((f) => String(f.properties?.room) === String(v.room));
+        if (!shape) return null;
+        return {
+          ...shape,
+          properties: {
+            ...shape.properties,
+            // It is this floor's stairwell as much as the other floor's, so
+            // it says so -- a click on it should not claim to be downstairs.
+            floor,
+            // where the outline came from, for anyone reading the source
+            tracedOnFloor: String(v.floor),
+          },
+        };
+      }));
+      return [...own, ...carried.filter(Boolean)];
+    };
+
+    const setFloorFeatures = (features) => {
+      const src = map.getSource(FLOOR_SRC);
+      if (src) src.setData({ type: "FeatureCollection", features });
+    };
+
+    const showBuildingFloor = async (buildingCode, floorLabel) => {
+      if (!String(buildingCode || "").trim()) return;
+      setFloorFeatures(await sheetFeatures(buildingCode, floorLabel));
+    };
+
+    /**
+     * Draw the inside of every building a route runs through.
+     *
+     * A route used to open the floor plan of the building it ENDED in and no
+     * other, so walking from SW3-1750 to SW5-2895 drew SW5's rooms and left
+     * SW3 -- where you are standing, and where the first steps happen -- as a
+     * plain blue block. "Start at 1750 (Lecture Hall)" names a room you
+     * cannot see.
+     *
+     * `sheets` is [{ building, floor }] in the order the route meets them, so
+     * where a route climbs through a building both floors are drawn: the one
+     * you walk in on and the one you arrive on.
+     */
+    const showRouteFloors = async (sheets) => {
+      const wanted = (sheets || [])
+        .map((s) => ({
+          building: String(s.building || "").trim(),
+          floor: String(s.floor || "").trim(),
+        }))
+        .filter((s) => s.building && s.floor);
+
+      if (!wanted.length) {
+        clearFloorView();
+        return;
+      }
+
+      const loaded = await Promise.all(
+        wanted.map((s) => sheetFeatures(s.building, s.floor)));
+      setFloorFeatures(loaded.flat());
+
+      const codes = [...new Set(wanted.map((s) => s.building))];
+      hideBuildingShapes(codes);
+
+      // Outlined together, so the route's buildings read as the ones being
+      // shown rather than one picked out and the rest left plain.
+      const sel = map.getSource(SEL_SRC);
+      if (sel) {
+        sel.setData({ type: "FeatureCollection", features: outlinesFor(codes) });
+      }
+
+      // Where a click on one of these rooms says it is, when the room's own
+      // properties do not say. The last sheet is the one the route arrives
+      // on, which is the floor a person is looking at by the end of it.
+      const arrival = wanted[wanted.length - 1];
+      currentBuildingCode = arrival.building;
+      currentBuildingLabel = arrival.building;
+      currentFloorLabel = arrival.floor;
+      currentFloorList = deriveFloorLabels(arrival.building, {});
+      clearSelectedRoom();
     };
 
     const zoomToFeatureGeom = (feat, padding = 40, maxZoom = 20) => {
@@ -657,9 +859,9 @@
              </button></li>`).join("")}</ul>`
         : "";
 
-      // opening a room is leaving the directions view, so the route that was
-      // drawn for it should not stay lying across the plan
-      if (window.BCITMap?.clearRouteOverlay) window.BCITMap.clearRouteOverlay();
+      // The route stays drawn. Opening a room while following directions is
+      // looking at somewhere along the way, not abandoning the route -- and
+      // Back on this card goes straight to the directions again.
 
       const sb = window.BCITMap && window.BCITMap.sidebar;
       if (sb) sb.setBody(html + othersHtml);
@@ -795,11 +997,20 @@
       }
     });
 
-    // Click-away → clear when not clicking building or room
+    // Click-away → clear when the click landed on nothing.
+    //
+    // A car park counts as something. It is a place with a card of its own --
+    // "Directions" and "Start Here" -- and leaving it out of this list meant
+    // clicking one drew that card and then wiped it in the same click, so a
+    // lot could be seen on the map and never actually opened.
     map.on("click", (e) => {
-      const features = map.queryRenderedFeatures(e.point, {
-        layers: ["buildings-fill", FLOOR_FILL_LAYER],
-      });
+      // Directions hold the map. The floors on show are the ones the route
+      // runs through, so clearing them because a click landed on grass would
+      // take the route's own drawing away from under it.
+      if (window.BCITMap?.hasRoute?.()) return;
+      const layers = ["buildings-fill", FLOOR_FILL_LAYER, "parking-fill"]
+        .filter((id) => map.getLayer(id));
+      const features = map.queryRenderedFeatures(e.point, { layers });
       if (!features.length) {
         clearFloorView();
       }
@@ -816,14 +1027,24 @@
      * room next door meant searching for it again. A room sits in a building,
      * so that is where back goes; back from the building leaves the floor.
      */
+    // Called by the router once it has a route, with the floors that route
+    // runs through; and again when the route is dismissed, to take them off.
+    window.BCITMap.showRouteFloors = showRouteFloors;
+    window.BCITMap.clearFloors = clearFloorView;
+
     window.BCITMap.leaveBuilding = () => {
       if (window.BCITMap.clearRouteOverlay) window.BCITMap.clearRouteOverlay();
       clearFloorView();
     };
 
     window.BCITMap.backToBuilding = () => {
-      if (window.BCITMap.clearRouteOverlay) window.BCITMap.clearRouteOverlay();
       clearSelectedRoom();
+      // Back goes where you came from. If a route is on the map you opened
+      // this room while following it, so back is the directions -- not the
+      // building card, which would leave the route drawn with nothing to say
+      // about it and no way to read the steps again.
+      if (window.BCITMap.hasRoute?.() && window.BCITMap.showLastDirections?.()) return;
+      if (window.BCITMap.clearRouteOverlay) window.BCITMap.clearRouteOverlay();
       if (currentBuildingCode) renderFloorPanel();
       else sidebar().reset();
     };

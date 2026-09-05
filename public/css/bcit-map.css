@@ -627,3 +627,42 @@ body {
   color: #6b7280;
   flex: 0 0 auto;
 }
+
+/* What "Start Here" set.
+   Green, to match the pin it drops on the map, and above the panel body so
+   it survives opening a room or stepping back to a building -- a start you
+   set two clicks ago is still your start. */
+.start-banner {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 12px 8px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: #e6f4ea;
+  border: 1px solid #b7e1c4;
+  font-size: 13px;
+  color: #14532d;
+}
+
+.start-banner-text {
+  flex: 1 1 auto;
+  line-height: 1.35;
+}
+
+.start-banner-clear {
+  flex: 0 0 auto;
+  border: 1px solid #b7e1c4;
+  background: #fff;
+  color: #14532d;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.start-banner-clear:hover {
+  background: #f1f8f3;
+}

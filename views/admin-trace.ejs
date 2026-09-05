@@ -20,6 +20,19 @@
         <h3>Floor Plan</h3>
         <select id="planPicker" aria-label="Floor plan"></select>
         <p class="tracer-hint" id="planStatus">Pick a floor to start.</p>
+
+        <!-- The network is the whole campus and every traced sheet is drawn
+             as context, so floor 1 used to sit directly underneath floor 2
+             while you traced it. On by default; the stairs and lifts of the
+             other floors stay either way, because a stairwell has to land in
+             the same place on every floor and there is nothing else to line
+             it up against. -->
+        <label class="tracer-toggle" id="floorFocusField" hidden>
+          <input type="checkbox" id="floorFocus" checked>
+          <span>Only this floor
+            <small id="floorFocusCount">stairs and lifts still show</small>
+          </span>
+        </label>
       </section>
 
       <!-- Two jobs, and the panel only ever shows one of them. Drawing what
@@ -142,6 +155,11 @@
           have open, so you can run a path out of a door, across the grass and
           into the next building.
         </p>
+
+        <!-- Filled in by renderZoneKey(). A node's colour says where it
+             stands relative to the floor you have open, which is how you tell
+             SE12's nodes from this floor's when you go to link them. -->
+        <ul class="tracer-key" id="zoneKey"></ul>
         <label class="tracer-field" id="netTypeField">
           <span>What Are You Drawing</span>
           <select id="netType">

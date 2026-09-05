@@ -88,8 +88,33 @@ body.tracer-body {
 /* a class rule beats the [hidden] attribute, so say it explicitly or every
    "hidden" row shows anyway */
 .tracer-row[hidden],
+.tracer-toggle[hidden],
 .tracer-block[hidden] {
   display: none;
+}
+
+/* A switch with its state written underneath it: "only this floor", and how
+   much that is currently keeping off the map. */
+.tracer-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 10px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #374151;
+  cursor: pointer;
+}
+
+.tracer-toggle input {
+  margin: 2px 0 0;
+  flex: 0 0 auto;
+}
+
+.tracer-toggle small {
+  display: block;
+  font-weight: 400;
+  color: #6b7280;
 }
 
 .tracer-row {
@@ -476,3 +501,40 @@ body.tracer-body {
   outline-offset: -1px;
 }
 
+
+/* Key to the node colours. A node's colour says where it stands relative to
+   the floor you have open, which is how you pick out the next building's
+   nodes when you go to link to them -- so the key carries the counts too. */
+.tracer-key {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 0.8rem;
+  color: #4b5563;
+}
+
+.tracer-key:empty {
+  display: none;
+}
+
+.tracer-key li {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.tracer-key i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1.5px solid #fff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, .15);
+}
+
+.tracer-key b {
+  font-weight: 600;
+  color: #111827;
+}
