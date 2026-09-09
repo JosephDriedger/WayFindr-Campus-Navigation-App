@@ -1,5 +1,13 @@
 import request from "supertest";
-import app from "../server.js";
+import { jest } from "@jest/globals";
+import { firebaseConfigStub } from "../test-utils/firebaseConfigStub.js";
+
+// These routes are the public ones -- they never reach Firestore or Auth --
+// so the app boots against a stubbed Firebase config. See the stub for why
+// loading the real one breaks under Jest.
+jest.unstable_mockModule("../config/firebase.js", firebaseConfigStub);
+
+const { default: app } = await import("../server.js");
 
 describe("Map page performance", () => {
   const MAX_HOME_TIME = 300; // ms

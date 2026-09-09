@@ -2,8 +2,8 @@
 //
 // The schedule page: add classes, see the week, and -- the part that makes it
 // worth having -- get a direct route to whichever room you are due in.
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
-import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-auth.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
 import {
   DAY_NAMES, DAY_SHORT, minutesOf, formatTime as fmtTime, parseRoomRef, findNowAndNext,
 } from "/js/schedule-time.js";

@@ -29,7 +29,7 @@ const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => (
 async function fetchJson(url, options) {
   const res = await fetch(url, options);
   const body = await res.text();
-  let data = null;
+  let data;
   try {
     data = JSON.parse(body);
   } catch {

@@ -489,7 +489,7 @@
       const codeUpper = String(buildingCode || "")
         .trim()
         .toUpperCase();
-      let labels = null;
+      let labels;
 
       const fromIndex = codeUpper && roomFloorsIndex[codeUpper];
       if (fromIndex && fromIndex.length) {

@@ -1,4 +1,4 @@
-import admin from "../config/firebase.js";
+import { getAuth } from "../config/firebase.js";
 
 /**
  * Does this request want data rather than a page?
@@ -28,7 +28,7 @@ export async function verifyFirebaseToken(req, res, next) {
       return res.redirect("/auth/login");
     }
 
-    const decodedToken = await admin.auth().verifyIdToken(token);
+    const decodedToken = await getAuth().verifyIdToken(token);
 
     req.user = decodedToken;
     if (req.session) req.session.user = decodedToken;

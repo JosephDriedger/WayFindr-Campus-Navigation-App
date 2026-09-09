@@ -1,11 +1,12 @@
 // Initialize Firebase Admin
-import admin from './../config/firebase.js';
-
-console.log('Firebase Admin initialized:', !!admin); // temporary check
+import { getFirestore } from './../config/firebase.js';
 
 
 
-const db = admin.firestore();
+
+const db = getFirestore();
+
+console.log('Firebase Admin initialized:', !!db); // temporary check
 
 async function fixNodeLinks() {
   const snapshot = await db.collection("nodes").get();

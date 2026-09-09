@@ -1,11 +1,11 @@
 // models/user.js
-import admin from "../config/firebase.js";
+import { getFirestore, FieldValue } from "../config/firebase.js";
 
 export default class User {
   constructor(uid) {
     if (!uid) throw new Error("UID is required to create a User instance");
     this.uid = uid;
-    this.userRef = admin.firestore().collection("users").doc(uid);
+    this.userRef = getFirestore().collection("users").doc(uid);
     this.favoritesRef = this.userRef.collection("favorites");
     this.scheduleRef = this.userRef.collection("schedule");
   }
@@ -14,7 +14,7 @@ export default class User {
   async ensureExists(profile = {}) {
     const doc = await this.userRef.get();
     if (!doc.exists) {
-      const now = admin.firestore.FieldValue.serverTimestamp();
+      const now = FieldValue.serverTimestamp();
       await this.userRef.set({
         uid: this.uid,
         email: profile.email || null,
@@ -41,7 +41,7 @@ export default class User {
   // Add or update a favorite. Uses nodeId as the favorite doc ID for easy lookup.
   async addFavorite(nodeId, { label = null, isKeyLocation = false, nodeMeta = {} } = {}) {
     if (!nodeId) throw new Error("nodeId is required");
-    const now = admin.firestore.FieldValue.serverTimestamp();
+    const now = FieldValue.serverTimestamp();
     const favRef = this.favoritesRef.doc(nodeId);
     await favRef.set({
       nodeId,
@@ -57,7 +57,7 @@ export default class User {
   // Update lastUsed when user uses the favorite
   async markFavoriteUsed(nodeId) {
     if (!nodeId) throw new Error("nodeId is required");
-    const now = admin.firestore.FieldValue.serverTimestamp();
+    const now = FieldValue.serverTimestamp();
     const favRef = this.favoritesRef.doc(nodeId);
     await favRef.update({ lastUsed: now });
     return { nodeId, lastUsed: now };
@@ -107,7 +107,7 @@ export default class User {
     if (!startTime || !endTime) throw new Error("startTime and endTime are required");
     if (endTime <= startTime) throw new Error("endTime must be after startTime");
 
-    const now = admin.firestore.FieldValue.serverTimestamp();
+    const now = FieldValue.serverTimestamp();
     const ref = this.scheduleRef.doc();
     const entry = {
       title,

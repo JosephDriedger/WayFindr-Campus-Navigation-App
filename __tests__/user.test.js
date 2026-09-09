@@ -31,7 +31,7 @@ jest.unstable_mockModule("../config/firebase.js", () => {
     data: () => mockFavorites.get(path),
   });
 
-  const firestore = () => ({
+  const getFirestore = () => ({
     collection: (colName) => ({
       doc: (uid) => ({
         get: () => Promise.resolve(makeDocSnapshot(`${colName}/${uid}`)),
@@ -100,12 +100,13 @@ jest.unstable_mockModule("../config/firebase.js", () => {
     }),
   });
 
-  firestore.FieldValue = {
+  const FieldValue = {
     serverTimestamp: () => "SERVER_TIMESTAMP",
   };
 
   return {
-    default: { firestore },
+    getFirestore,
+    FieldValue,
     __mockSet: mockSet,
     __mockUpdate: mockUpdate,
     __mockDelete: mockDelete,

@@ -1,15 +1,19 @@
 // __tests__/logger.test.js
 import { jest } from "@jest/globals";
 
-// --- Mock firebase-admin ---
-jest.unstable_mockModule("firebase-admin", () => ({
-  default: {
-    firestore: () => ({
-      collection: jest.fn(() => ({
-        add: jest.fn(() => Promise.resolve("mocked-id")),
-      })),
-    }),
-  },
+// --- Mock the Firestore handle the logger reaches for ---
+// Held behind a mutable ref so a test can swap in a failing Firestore;
+// the module namespace itself is read-only, so it cannot be reassigned.
+const firestoreImpl = {
+  current: () => ({
+    collection: jest.fn(() => ({
+      add: jest.fn(() => Promise.resolve("mocked-id")),
+    })),
+  }),
+};
+
+jest.unstable_mockModule("../config/firebase.js", () => ({
+  getFirestore: () => firestoreImpl.current(),
 }));
 
 // --- Import the actual logger now ---
@@ -33,8 +37,7 @@ describe("logger.js – logCritical", () => {
 
   test("handles Firestore failure gracefully", async () => {
     // Override firestore to throw
-    const admin = await import("firebase-admin");
-    admin.default.firestore = () => ({
+    firestoreImpl.current = () => ({
       collection: jest.fn(() => ({
         add: jest.fn(() => { throw new Error("Firestore down"); }),
       })),

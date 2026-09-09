@@ -1,5 +1,5 @@
 import express from "express";
-import admin from "../config/firebase.js";
+import { getAuth } from "../config/firebase.js";
 import { verifyFirebaseToken } from '../middleware/authMiddleware.js';
 import User from "../models/user.js"; // our Firestore user model
 
@@ -13,7 +13,7 @@ router.post('/sessionLogin', async (req, res, next) => {
   const idToken = req.body.idToken;
   const expiresIn = 60 * 60 * 24 * 5 * 1000; // 5 days
   try {
-    const decodedToken = await admin.auth().verifyIdToken(idToken);
+    const decodedToken = await getAuth().verifyIdToken(idToken);
 
     // Create Firestore user if not exists
     const user = new User(decodedToken.uid);
@@ -27,7 +27,7 @@ router.post('/sessionLogin', async (req, res, next) => {
       console.log(`Created Firestore user doc for UID: ${decodedToken.uid}`);
     }
         
-    const sessionCookie = await admin.auth().createSessionCookie(idToken, { expiresIn });
+    const sessionCookie = await getAuth().createSessionCookie(idToken, { expiresIn });
     res.cookie('session', sessionCookie, {
       httpOnly: true,
       // secure: true was dropping this cookie on every plain-http request, so

@@ -4,11 +4,9 @@ import { jest } from "@jest/globals";
 // 1️⃣ Mock Firebase BEFORE importing middleware
 const mockVerifyIdToken = jest.fn();
 await jest.unstable_mockModule("../config/firebase.js", () => ({
-  default: {
-    auth: () => ({
-      verifyIdToken: mockVerifyIdToken,
-    }),
-  },
+  getAuth: () => ({
+    verifyIdToken: mockVerifyIdToken,
+  }),
 }));
 
 // 2️⃣ Import the middleware AFTER mocking

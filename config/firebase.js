@@ -1,14 +1,16 @@
 // config/firebase.js
-import admin from "firebase-admin";
+import { initializeApp, getApps, cert } from "firebase-admin/app";
+import { getFirestore, FieldValue } from "firebase-admin/firestore";
+import { getAuth } from "firebase-admin/auth";
 import dotenv from "dotenv";
 
 dotenv.config();
 
 // In tests, don't require a real service account
 if (process.env.NODE_ENV === "test") {
-  if (!admin.apps.length) {
-    admin.initializeApp({
-      // minimal config so admin.firestore() works in tests
+  if (!getApps().length) {
+    initializeApp({
+      // minimal config so getFirestore() works in tests
       projectId: "demo-test",
     });
   }
@@ -29,12 +31,16 @@ if (process.env.NODE_ENV === "test") {
 
   if (!serviceAccount || !serviceAccount.project_id) {
     console.warn("FIREBASE_SERVICE_ACCOUNT_KEY missing or invalid in .env");
-  } else if (!admin.apps.length) {
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount),
+  } else if (!getApps().length) {
+    initializeApp({
+      credential: cert(serviceAccount),
       projectId: process.env.FIREBASE_PROJECT_ID || serviceAccount.project_id,
     });
   }
 }
 
-export default admin;
+// firebase-admin v13 dropped the old `admin.firestore()` / `admin.auth()`
+// namespace in favour of these per-product entry points. They are re-exported
+// from here rather than imported from the SDK directly so that reaching for
+// Firestore or Auth always goes through the module that ran initializeApp().
+export { getFirestore, getAuth, FieldValue };

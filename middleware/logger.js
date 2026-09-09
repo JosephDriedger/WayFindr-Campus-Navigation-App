@@ -3,7 +3,7 @@ import winston from "winston";
 import "winston-daily-rotate-file";
 import morgan from "morgan";
 import chalk from "chalk";
-import admin from "firebase-admin";
+import { getFirestore } from "../config/firebase.js";
 
 const logDir = "logs";
 if (!fs.existsSync(logDir)) fs.mkdirSync(logDir);
@@ -52,7 +52,7 @@ export const requestLogger = morgan((tokens, req, res) => {
 // Firestore helper for critical logs
 export async function logCritical(event, details = {}) {
   try {
-    const db = admin.firestore();
+    const db = getFirestore();
     await db.collection("logs").add({
       event,
       details,

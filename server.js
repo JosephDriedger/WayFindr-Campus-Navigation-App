@@ -16,7 +16,7 @@ import calibratorRouter from "./routes/calibrator.js";
 import FileSessionStore from "./services/sessionStore.js";
 import { requestLogger } from "./middleware/logger.js";
 import { errorHandler } from './middleware/errorHandler.js';
-import admin from './config/firebase.js';
+import { getFirestore } from './config/firebase.js';
 
 dotenv.config();
 const app = express();
@@ -26,7 +26,7 @@ const require = createRequire(import.meta.url);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const db = admin.firestore();
+const db = getFirestore();
 
 // The traced network is one document and it grows: a few hundred nodes and
 // the links between them is already past express.json()'s 100kb default, and

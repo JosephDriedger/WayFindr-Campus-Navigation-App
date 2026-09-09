@@ -1,5 +1,5 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
-import { getAuth } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-auth.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
+import { getAuth } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
 import { classDueNow } from "/js/schedule-time.js";
 
 window.addEventListener("DOMContentLoaded", () => {
@@ -1310,7 +1310,7 @@ window.addEventListener("DOMContentLoaded", () => {
     if (!window.__SIGNED_IN__) return;
     const bannerEl = document.getElementById('class-banner');
     if (!bannerEl) return;
-    let schedule = [];
+    let schedule;
     try {
       const token = await getIdToken();
       const res = await fetch('/api/schedule', { headers: { Authorization: `Bearer ${token}` } });
