@@ -538,3 +538,48 @@ body.tracer-body {
   font-weight: 600;
   color: #111827;
 }
+
+
+/* Connecting two buildings: two pickers and a button, set apart from the
+   drawing tools above them because nothing here is drawn -- you name the two
+   places and the nearest pair of nodes is found for you. */
+.tracer-bridge {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #f9fafb;
+}
+
+/* the class rule above would otherwise beat the [hidden] attribute, and the
+   block would show whichever tool was chosen */
+.tracer-bridge[hidden] {
+  display: none;
+}
+
+.tracer-bridge .tracer-bridge-end:first-child .tracer-field {
+  margin-top: 0;
+}
+
+/* A place and the floor of it, side by side, because they are one answer:
+   "SE12, floor 2" is where the other end of this link is. The floor column
+   takes only what it needs, and disappears entirely where there are no floors
+   to choose between. */
+.tracer-bridge-end {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: end;
+}
+
+.tracer-bridge-end:has(> .tracer-field[hidden]) {
+  grid-template-columns: 1fr;
+}
+
+.tracer-bridge-end .tracer-field[hidden] {
+  display: none;
+}
+
+.tracer-bridge-end select {
+  min-width: 0;
+}

@@ -9,6 +9,8 @@
 // rooms are attached to the drawing rather than to the ground. They are only
 // converted to real coordinates on save.
 
+import { SPACE_COLOURS, byType } from "./space-colours.js";
+
 const BCIT = { lng: -123.0011, lat: 49.2505, zoom: 15.6 };
 const R_EARTH = 6378137;
 const SNAP_PX = 12; // click within this of an existing corner and it reuses it
@@ -83,6 +85,18 @@ window.BCITTracer = {
 let plans = [];
 let current = null;      // the plan being traced
 let placement = null;    // { lng, lat, widthM, rotation } -- where the plan sits
+/**
+ * Has the plan been moved since it was read?
+ *
+ * Leaving the Move/Rotate handles writes the placement back, and so does
+ * switching mode or opening a floor, because both drop out of adjusting. That
+ * meant merely LOOKING at a sheet rewrote its placement file -- harmless when
+ * the value is the one just read, and not harmless at all when it is not:
+ * whatever was in `placement` at that moment got written under whatever
+ * `current` said, so one bad moment put one floor's position under another
+ * floor's name. Nothing is written now unless something actually moved it.
+ */
+let placementMoved = false;
 let rooms = [];          // [{ kind, uv, room, type, name }] -- outlines and markers
 // A door or an entrance is a position, not an area, so it is placed with a
 // single click and stored as one point. Everything else is an outline.
@@ -96,6 +110,13 @@ const isPointType = (t) => POINT_TYPES.has(t);
 // could not simply drop nodes where you wanted them without also committing
 // to the order you happened to place them in.
 const isLinkType = (t) => t === "link";
+// Joining two buildings is the same act -- one link between two nodes -- but
+// not the same job. The nodes you want are the two either side of the door
+// between SW3 and SE12, and they look exactly like the six hundred others, so
+// picking them off the map is where it goes wrong. This one names the two
+// floors first and takes every other node off the map, so the two left to
+// click are the two you meant. See bridgeClick().
+const isBridgeType = (t) => t === "bridge";
 
 /** The type currently being drawn, from whichever mode is active. */
 const activeType = () =>
@@ -134,6 +155,30 @@ const DRAFT_SRC = "draft-room";
  * linking OUT to, and says which kind of somewhere. Kept in one table so the
  * dots on the map and the key beside them cannot drift apart.
  */
+/**
+ * How a traced outline is painted while you are drawing it.
+ *
+ * The same colours the public map uses, because tracing is checking: you are
+ * looking at what you drew to see whether it is right, and it is only
+ * checkable against the sheet if a room looks like a room rather than like
+ * every other outline on the floor. One flat blue for all of them meant a
+ * service cupboard, a corridor and a lecture theatre were the same picture,
+ * and a stairwell traced as a room looked correct until it reached the map.
+ *
+ * Selection is the one thing the map has no opinion about, and it has to
+ * survive the colours: with forty outlines in six colours, "which of these is
+ * the one I am about to delete" is answered by the heavy dark edge, not by a
+ * shade of fill.
+ */
+const isSelected = ["boolean", ["get", "selected"], false];
+// A sheet from another building, drawn in full rather than as grey context,
+// because it is the other half of the connection being made. See bridgeSheets().
+const IS_COMPANION = ["boolean", ["get", "companion"], false];
+const PLAN_FILL_OPACITY = ["case", isSelected, 0.85, byType("opacity")];
+const PLAN_LINE_COLOUR = ["case", isSelected, "#111827", byType("line")];
+// heavier than the map's, because here the line is the thing you are placing
+const PLAN_LINE_WIDTH = ["case", isSelected, 4, ["*", 1.6, byType("width")]];
+
 const ZONE_COLOURS = {
   here:    { dot: "#f59e0b", label: "This floor" },
   floor:   { dot: "#10b981", label: "Other floor" },
@@ -229,16 +274,20 @@ function ensureLayers() {
     map.addSource(ROOMS_SRC, { type: "geojson", data: emptyFC() });
     map.addLayer({
       id: "traced-fill", type: "fill", source: ROOMS_SRC,
-      paint: { "fill-color": "#1a73e8", "fill-opacity": 0.22 },
+      paint: { "fill-color": byType("fill"), "fill-opacity": PLAN_FILL_OPACITY },
     });
     map.addLayer({
       id: "traced-line", type: "line", source: ROOMS_SRC,
-      paint: { "line-color": "#1a73e8", "line-width": 2 },
+      paint: { "line-color": PLAN_LINE_COLOUR, "line-width": PLAN_LINE_WIDTH },
     });
     map.addLayer({
       id: "traced-label", type: "symbol", source: ROOMS_SRC,
       layout: { "text-field": ["get", "room"], "text-size": 12 },
-      paint: { "text-color": "#0b3d91", "text-halo-color": "#fff", "text-halo-width": 1.5 },
+      paint: {
+        "text-color": byType("label"),
+        "text-halo-color": "#fff",
+        "text-halo-width": 1.5,
+      },
     });
   }
   if (!map.getSource(MARKS_SRC)) {
@@ -330,16 +379,28 @@ function ensureLayers() {
     // layers. Without it the tracer opens on a blank map and there is no way
     // to see -- or get back to -- what you have already done.
     map.addSource(OVERVIEW_SRC, { type: "geojson", data: emptyFC() });
+    // Beneath the sheet you are tracing, which is what the paragraph above
+    // always claimed and what the layer order never did: added last, these
+    // drew ON TOP, so every neighbouring floor laid a grey wash over the one
+    // being worked on. It matters more now that a companion sheet is drawn in
+    // full colour -- on top, it would simply cover the floor you are editing.
+    const under = map.getLayer("traced-fill") ? "traced-fill" : undefined;
     map.addLayer({
       id: "overview-fill", type: "fill", source: OVERVIEW_SRC,
       filter: ["==", ["geometry-type"], "Polygon"],
-      paint: { "fill-color": "#64748b", "fill-opacity": 0.18 },
-    });
+      paint: {
+        "fill-color": ["case", IS_COMPANION, byType("fill"), "#64748b"],
+        "fill-opacity": ["case", IS_COMPANION, byType("opacity"), 0.18],
+      },
+    }, under);
     map.addLayer({
       id: "overview-line", type: "line", source: OVERVIEW_SRC,
       filter: ["==", ["geometry-type"], "Polygon"],
-      paint: { "line-color": "#475569", "line-width": 1 },
-    });
+      paint: {
+        "line-color": ["case", IS_COMPANION, byType("line"), "#475569"],
+        "line-width": ["case", IS_COMPANION, ["*", 1.4, byType("width")], 1],
+      },
+    }, under);
     map.addLayer({
       id: "overview-dot", type: "circle", source: OVERVIEW_SRC,
       filter: ["==", ["geometry-type"], "Point"],
@@ -347,6 +408,8 @@ function ensureLayers() {
     });
     map.addLayer({
       id: "overview-label", type: "symbol", source: OVERVIEW_SRC,
+      // a companion sheet is the one you are reading, so its name is legible
+      // rather than another piece of faint context
       // One label per floor, on the marker made for it -- writing the sheet
       // name across every room on the sheet said the same thing forty times
       // and told you nothing about any of them.
@@ -357,7 +420,9 @@ function ensureLayers() {
         "text-allow-overlap": true,
       },
       paint: {
-        "text-color": "#334155", "text-halo-color": "#fff", "text-halo-width": 1.5,
+        "text-color": ["case", IS_COMPANION, "#0f172a", "#334155"],
+        "text-halo-color": "#fff",
+        "text-halo-width": 1.5,
       },
     });
   }
@@ -427,6 +492,14 @@ const VERTICAL_TYPES = new Set(["stairs", "elevator"]);
 /** Off only when someone has asked to see every floor at once. */
 let floorFocus = true;
 
+/**
+ * The two floors being joined, while the Connect Two Buildings tool is open.
+ *
+ * `{ from, fromFloor, to, toFloor }`, or null when the tool is shut. It is
+ * the answer to "which nodes are even on the map": see onHiddenFloor().
+ */
+let bridgeEnds = null;
+
 /** How a space is named across the campus: "SW5|2|1840". */
 const spaceKey = (building, floor, room) =>
   `${String(building || "").toUpperCase()}|${floor ?? ""}|${String(room || "").toUpperCase()}`;
@@ -473,13 +546,20 @@ function isVerticalSpace(item) {
  * is a line into empty space, and there is nothing useful to do with it.
  */
 function onHiddenFloor(item) {
-  if (!floorFocus || !current || !item) return false;
+  if (!item) return false;
   if (item.kind === "path") {
     return (item.nodes || []).some((nid) => {
       const end = nodeById(nid);
       return end ? onHiddenFloor(end) : false;
     });
   }
+  // While two floors are being joined, those two floors ARE the network.
+  // Six hundred other dots are not context here, they are the hazard: the
+  // whole difficulty of joining SW3 to SE12 is that the wrong node looks
+  // exactly like the right one. So everything else comes off the map, and
+  // what is left to click is only the two floors you named.
+  if (bridgeEnds && item.type === "node") return !atBridgeEnd(item);
+  if (!floorFocus || !current) return false;
   return onOtherFloor(item) && !isVerticalSpace(item);
 }
 
@@ -580,10 +660,14 @@ function displayNames() {
     }
     if (r.type === "node") {
       seen.node = (seen.node || 0) + 1;
+      // Counting is the fallback, for a node placed before it had a building
+      // to be named after -- naming happens on save, when the server decides
+      // which place a node actually stands in.
+      const label = r.name || `Node ${seen.node}`;
       return {
-        title: `Node ${seen.node}`,
-        sub: r.room ? `serves ${r.room}` : "unassigned",
-        short: `N${seen.node}${r.room ? ` · ${r.room}` : ""}`,
+        title: label,
+        sub: r.room ? `serves ${r.room}` : (r.building || "outdoors"),
+        short: label,
       };
     }
     if (isPointType(r.type)) {
@@ -730,6 +814,220 @@ function whereIs(node) {
 }
 
 /**
+ * What a node is called.
+ *
+ * "Node 7" was a number counted off the list, so it changed whenever anything
+ * before it was deleted and meant nothing on the map -- you could not look at
+ * a dot and a row and tell they were the same thing. A name says where the
+ * node IS: the building it stands in, and then the room it serves, because
+ * that is how everybody already refers to a place here -- SW3-1615 is what
+ * the search box and the deep links have always used.
+ *
+ * A node in no room takes its floor and the next free number instead --
+ * SW3-2H1, the first unassigned node on floor 2 of SW3 -- so the corridors
+ * and the paths outside are still named after somewhere rather than after
+ * nothing.
+ *
+ * The floor is there because it is the first thing you need to know about a
+ * corridor node and the only thing its name could not otherwise tell you: a
+ * room number carries its own floor here (1602 is floor 1, 2690 is floor 2)
+ * and a bare count carries nothing. It also means each floor counts from one,
+ * so the numbers stay short and a floor can be renumbered without touching
+ * the others.
+ *
+ * The H keeps the two forms apart. Room numbers are digits, so without it
+ * SW3-1 and SW3-1602 are the same shape of name and there is no telling by
+ * looking whether a node sits in room 1 or is simply the first unassigned
+ * node in SW3. That ambiguity is not only a reading problem: it is what a
+ * tool has to answer to know whether a name has gone stale.
+ */
+const OUTDOOR_PREFIX = "OUT";
+
+// What marks a name as a count rather than a room, inside a building: H,
+// for the hallway or corridor such a node almost always stands in.
+//
+// Only where there are hallways to stand in, and room numbers to be confused
+// with. Outdoors has neither -- there is no corridor across the grass, and no
+// room number for OUT-5 to be mistaken for -- so out there a count is just a
+// count. The same goes for a car park.
+const SPARE_MARK = "H";
+
+/** Does this place have floors, and so hallways and room numbers? */
+const placeIsMarked = (prefix) => prefix !== OUTDOOR_PREFIX
+  && tracedSheets(prefix).length > 0;
+
+// The floor written into a spare name, or nothing for a node that belongs to
+// no storey -- one on a path across the campus, or standing at another
+// building's door while a different sheet was open.
+const floorMark = (r) => (r.floor == null || r.floor === "" ? "" : String(r.floor));
+
+/**
+ * Every traced outline, by the floor it is on, as rings in world coordinates.
+ *
+ * The building's own boundary is left out: everything on the floor is inside
+ * it, so it answers "is this node in a space" with yes for the whole site.
+ *
+ * Built from the overview, which holds every sheet, with the open one taken
+ * live from `rooms` instead -- what you have drawn in the last minute counts
+ * as traced, and the overview's copy of that sheet is only as new as the last
+ * save. Thrown away whenever anything is edited, so it cannot go stale.
+ */
+let shapeIndex = null;
+const forgetShapeIndex = () => { shapeIndex = null; };
+
+function tracedShapes() {
+  if (shapeIndex) return shapeIndex;
+  const index = new Map();
+  const add = (building, floor, ring) => {
+    const key = `${String(building || "").toUpperCase()}|${floor ?? ""}`;
+    if (!index.has(key)) index.set(key, []);
+    index.get(key).push(ring);
+  };
+  for (const f of overviewFeatures) {
+    const props = f.properties || {};
+    if (!props.type || props.type === "building") continue;
+    if (f.geometry?.type !== "Polygon") continue;
+    if (current && props.stem === current.stem) continue;   // the live copy wins
+    add(props.building, props.floor, f.geometry.coordinates[0]);
+  }
+  if (current && placement) {
+    for (const r of rooms) {
+      if (r.kind !== "polygon" || r.type === "building") continue;
+      add(current.building, current.floor, r.uv.map(uvToLngLat));
+    }
+  }
+  shapeIndex = index;
+  return index;
+}
+
+/**
+ * Is this node standing in a room, a corridor, a stairwell -- anything drawn?
+ *
+ * A node on a floor of its own can only be held by that floor's outlines. One
+ * on no floor is answered by any storey of the building, because a node at a
+ * door belongs to whichever it opens onto.
+ */
+function insideTracedShape(r) {
+  const floor = floorMark(r);
+  // A node on no storey is on nobody's floor plan, so no floor plan holds it.
+  // These are the ones placed while another building's sheet was open -- the
+  // paths that run across the campus and past the wall -- and clipping the
+  // edge of a corridor three floors up by half a metre is not being in that
+  // corridor. Open the sheet it really belongs to and Name Nodes will give it
+  // that floor, and the room, and a name to match.
+  if (!floor) return false;
+  const at = itemLngLat(r);
+  if (!at) return false;
+  const index = tracedShapes();
+  const building = String(r.building || "").toUpperCase();
+  return (index.get(`${building}|${floor}`) || []).some((ring) => inRing(ring, at));
+}
+
+/**
+ * The building, car park, or OUT that a node's name is built on.
+ *
+ * Standing within a building's footprint is not the same as being in the
+ * building. A path across the campus runs right past the wall, and part of a
+ * traced floor is often nothing but the space between the rooms -- so a node
+ * that is inside SW3's outline but inside none of SW3's rooms, corridors or
+ * stairwells is not somewhere in SW3. It is outside, and calling it SW3-2H4
+ * says it is on floor 2 of a building it has never been in.
+ *
+ * The test is only asked where it can be answered. A car park has no traced
+ * shapes and never will, so a node in one is in the lot it says it is in;
+ * and a node that names a room is in that room by saying so.
+ */
+function namePrefix(r) {
+  const place = r.building ? String(r.building) : null;
+  if (!place) return OUTDOOR_PREFIX;
+  if (r.room) return place;
+  if (!tracedSheets(place).length) return place;
+  return insideTracedShape(r) ? place : OUTDOOR_PREFIX;
+}
+
+/**
+ * The names this node could be called, in order of preference.
+ *
+ * A room with two doors has two nodes in it and they cannot both be
+ * SW3-1615, so the second is SW3-1615-2. Told as a sequence rather than a
+ * single answer because which one is free depends on the others.
+ */
+function* nameCandidates(r, prefix = namePrefix(r)) {
+  if (r.room) {
+    yield `${prefix}-${r.room}`;
+    for (let i = 2; i <= 99; i += 1) yield `${prefix}-${r.room}-${i}`;
+  }
+  if (!placeIsMarked(prefix)) {
+    // nothing here to tell a count apart from, so it is told plainly
+    for (let i = 1; ; i += 1) yield `${prefix}-${i}`;
+  }
+  const floor = floorMark(r);
+  for (let i = 1; ; i += 1) yield `${prefix}-${floor}${SPARE_MARK}${i}`;
+}
+
+/** The first name for this node that nothing else has taken. */
+function freeNodeName(r, used, prefix = namePrefix(r)) {
+  for (const name of nameCandidates(r, prefix)) {
+    if (!used.has(name)) return name;
+  }
+  return null;   // unreachable: the numbered run has no end
+}
+
+// A place, a floor, the mark and a count: "SW3-2H7". Read off the name itself
+// rather than checked against what the node is now, so that a node which has
+// moved -- out of a building, or onto another floor -- is seen to disagree
+// with its own name.
+const SPARE_FORM = /^(.*)-([0-9]*)H([0-9]+)$/;
+// And the unmarked form, "OUT-7", which is only a count where the place it
+// names has no room numbers for it to be confused with.
+const PLAIN_FORM = /^(.*)-([0-9]+)$/;
+
+/**
+ * Read a spare name back: what it claims about the node, or null if the name
+ * is not one of ours.
+ *
+ * Inside a building the H is what makes this answerable -- see SPARE_MARK.
+ * Outside, the place itself answers it: OUT and a car park have no rooms, so
+ * a trailing number there can only be a count.
+ */
+function spareName(r) {
+  const name = String(r.name || "");
+  const marked = SPARE_FORM.exec(name);
+  if (marked) return { prefix: marked[1], floor: marked[2], marked: true };
+  const plain = PLAIN_FORM.exec(name);
+  if (plain && !placeIsMarked(plain[1])) {
+    return { prefix: plain[1], floor: "", marked: false };
+  }
+  return null;
+}
+
+/**
+ * Has this node's own name stopped describing it?
+ *
+ * Only a spare name can: it is a count of where nothing else was known, so it
+ * goes wrong the moment something is. A node that has since been matched to a
+ * room should be named after the room, and one that has moved to another
+ * floor should not still say the floor it left. SW3-1615, and anything
+ * somebody typed, mean what they say wherever the node ends up.
+ */
+function spareNameStale(r) {
+  const spare = spareName(r);
+  if (!spare) return false;
+  if (r.room) return true;
+  const prefix = namePrefix(r);
+  if (spare.prefix !== prefix) return true;
+  const marked = placeIsMarked(prefix);
+  // it moved between a place that marks its counts and one that does not
+  if (spare.marked !== marked) return true;
+  return marked && spare.floor !== floorMark(r);
+}
+
+/** Every node name in use, so a new one cannot collide with one. */
+const usedNodeNames = () => new Set(
+  rooms.filter((r) => r.type === "node" && r.name).map((r) => String(r.name)),
+);
+
+/**
  * A walking node, as it is stored: a position in the world, the building it
  * stands in and the space it serves. No plan-space coordinates and no source
  * sheet -- the node is not part of a drawing.
@@ -749,8 +1047,9 @@ function nodeFeature(r) {
       building: r.building ?? null,
       floor: r.floor ?? null,
       room: r.room || null,
-      // only for drawing; the saved file never sees it
-      zone: nodeZone(r),
+      // What this node is called: its building and the room it serves, or its
+      // building and a number. See nameCandidates().
+      name: r.name || null,
     },
     geometry: { type: "Point", coordinates: itemLngLat(r) },
   };
@@ -767,6 +1066,13 @@ function renderFeature(r, i) {
   f.properties = {
     ...f.properties, idx: i, selected: i === selected,
     mapLabel: names[i]?.short || "",
+    // Where the node stands relative to the open sheet, which is what its
+    // colour says. Added here rather than in nodeFeature() because it is not
+    // a fact about the node: it changes when you open a different floor, and
+    // when it was part of the saved feature every node on campus counted as
+    // changed on every floor change -- so a one-node edit sent the whole
+    // network back as a "change".
+    ...(r.type === "node" ? { zone: nodeZone(r) } : {}),
   };
   return f;
 }
@@ -823,6 +1129,7 @@ function scheduleListRender() {
     const t0 = performance.now();
     renderRoomList();
     renderZoneKey();
+    renderTypeKey();
     if (profile) profile.list = Math.round((performance.now() - t0) * 10) / 10;
   }, 16);
 }
@@ -836,6 +1143,13 @@ function scheduleListRender() {
  */
 function applyModeStyling() {
   const net = mode === "network";
+  // ...except while two buildings are being joined, when reading both floor
+  // plans IS the job. The network drops back to being a wash over a full
+  // floor plan in every other network task; here it is the other way round,
+  // and a sheet at 7% next to a companion sheet at full strength is not two
+  // floors you can compare -- it is one floor and a ghost.
+  const readingFloors = net && isBridgeType(activeType());
+  const faded = net && !readingFloors;
   const set = (layer, prop, value) => {
     if (map.getLayer(layer)) map.setPaintProperty(layer, prop, value);
   };
@@ -848,9 +1162,9 @@ function applyModeStyling() {
     if (map.getLayer(layer)) map.setFilter(layer, f);
   };
 
-  set("traced-fill", "fill-opacity", net ? 0.07 : 0.22);
-  set("traced-line", "line-opacity", net ? 0.35 : 1);
-  set("traced-label", "text-opacity", net ? 0.35 : 1);
+  set("traced-fill", "fill-opacity", faded ? 0.07 : PLAN_FILL_OPACITY);
+  set("traced-line", "line-opacity", faded ? 0.35 : 1);
+  set("traced-label", "text-opacity", faded ? 0.35 : 1);
 
   // The network is shown when you are working on it and gone when you are
   // not. Fading it to 30% still left a web of lines over every room while
@@ -880,7 +1194,7 @@ function setMode(next) {
   el("listBlock").hidden = next !== "plan";
   el("netListBlock").hidden = next !== "network";
   el("netToolsResult").hidden = true;
-  el("startNetDraw").textContent = networkButtonLabel();
+  syncNetTool();
   setDrawHint(next === "network"
     ? "Click where someone can stand. A node inside a building belongs to it."
     : "Click each corner, then Finish. Double-click also closes it.");
@@ -894,7 +1208,7 @@ function redrawDraft() {
   // a path chain draws itself into the real layers as it goes, so there is
   // no separate draft outline to show
   const t = activeType();
-  if (!draft || !draft.length || t === "node" || isLinkType(t)) {
+  if (!draft || !draft.length || t === "node" || isLinkType(t) || isBridgeType(t)) {
     return src.setData(emptyFC());
   }
   const pts = draft.map(uvToLngLat);
@@ -977,6 +1291,7 @@ function makeHandles() {
     const p = moveMarker.getLngLat();
     placement.lng = p.lng;
     placement.lat = p.lat;
+    placementMoved = true;
     applyPlacement();
     markDirty();
   });
@@ -992,6 +1307,7 @@ function makeHandles() {
   sizeMarker.on("drag", () => {
     const [dx, dy] = offsetFromCentre(sizeMarker.getLngLat());
     placement.widthM = Math.max(2, Math.hypot(dx, dy) / halfDiagPerWidth());
+    placementMoved = true;
     applyPlacement();
     markDirty();
   });
@@ -1005,6 +1321,7 @@ function makeHandles() {
     // the stalk points straight up out of the plan, so the plan's angle is
     // wherever the stalk is now, less that quarter turn
     placement.rotation = (Math.atan2(dy, dx) * 180) / Math.PI - 90;
+    placementMoved = true;
     applyPlacement();
     markDirty();
   });
@@ -1050,6 +1367,7 @@ async function fitToBuilding() {
     const lat = (Math.min(...lats) + Math.max(...lats)) / 2;
     const widthM = (Math.max(...lngs) - Math.min(...lngs)) * mPerDegLng(lat);
     placement = { lng, lat, widthM: Math.max(widthM, 20), rotation: placement?.rotation ?? 0 };
+    placementMoved = true;   // a fitted plan has never been written down
     applyPlacement();
     map.fitBounds([[Math.min(...lngs), Math.min(...lats)],
       [Math.max(...lngs), Math.max(...lats)]], { padding: 80, duration: 600 });
@@ -1227,6 +1545,15 @@ function onMapClick(e) {
   }
   const type = activeType();
 
+  if (isBridgeType(type)) {
+    if (!bridgeEnds) {
+      setDrawHint("Pick a place and a floor at each end first.");
+      return;
+    }
+    bridgeClick(e.lngLat);
+    return;
+  }
+
   if (isLinkType(type)) {
     // both ends must be nodes that already exist -- a link joins things you
     // put there on purpose, it does not invent them
@@ -1284,8 +1611,9 @@ function onMapClick(e) {
     // is what makes "take me to Lot L" mean anything. Worked out once: it is
     // asked for three times below and it walks the campus outlines.
     const place = buildingAt(ll);
+    const used = usedNodeNames();
     forgetNodeIndex();
-    rooms.push({
+    const placed = {
       kind: "point", type: "node", nid: newNodeId(),
       // world coordinates: a node is part of the campus network, not of the
       // drawing that happened to be open when it was placed
@@ -1295,7 +1623,11 @@ function onMapClick(e) {
       // the floor only means something if this is the building whose floor
       // is open; a node dropped anywhere else is on no particular floor
       floor: current && place === current.building ? current.floor : null,
-    });
+    };
+    // Named from where it landed, now, rather than left as "Node 412" until
+    // somebody runs a tool over it.
+    placed.name = freeNodeName(placed, used);
+    rooms.push(placed);
     redrawRooms();
     markDirty();
     const n = rooms.filter((r) => r.type === "node").length;
@@ -1307,7 +1639,7 @@ function onMapClick(e) {
       ? `serves ${servedRoom}${place ? ` in ${place}` : ""}`
       : place ? `is in ${place}`
         : "is outdoors, in no building or lot";
-    setDrawHint(`${n} nodes placed — this one ${where}.`);
+    setDrawHint(`${n} nodes placed — ${placed.name} ${where}.`);
     return;
   }
 
@@ -1327,7 +1659,12 @@ function onMapClick(e) {
 }
 
 function setDrawHint(text) {
-  const target = mode === "network" ? el("netHint") : el("drawHint");
+  // The bridge tool's own hint sits under its pickers; writing to the general
+  // network hint would put the instructions somewhere you are not looking,
+  // and leave two hints disagreeing about what to do next.
+  const target = mode === "network"
+    ? (isBridgeType(activeType()) ? el("bridgeHint") : el("netHint"))
+    : el("drawHint");
   if (target) target.textContent = text;
 }
 
@@ -1335,7 +1672,12 @@ function setDrafting(on) {
   // a marker is one click, so it has nothing to finish or undo
   // nodes and links have nothing to "finish" -- each click completes itself
   const t = activeType();
-  el("draftControls").hidden = !on || isPointType(t) || isLinkType(t);
+  el("draftControls").hidden = !on || isPointType(t) || isLinkType(t)
+    || isBridgeType(t);
+  // Its buttons sit under its own pickers, because you choose the two ends
+  // before you start clicking and a Start button above them reads backwards.
+  el("bridgeStart").disabled = on;
+  el("bridgeDone").hidden = !(on && isBridgeType(t));
   // ...but placing nodes and drawing links run until you stop them, and
   // until now the only way to stop was Esc or switching tool. A visible Done
   // is what tells you the mode is still on, as well as how to leave it.
@@ -1450,6 +1792,33 @@ function fillList(list, entries, emptyText, opts = {}) {
  * Counted, because the useful question is not "what does pink mean" but "how
  * many nodes are there in the next building for me to link to".
  */
+/** What the Draw picker calls this kind of outline. */
+const outlineTypeLabel = (type) =>
+  (OUTLINE_TYPES.find(([value]) => value === type) || [])[1] || type;
+
+/**
+ * The key to the outline colours, written from the table that paints them.
+ *
+ * Six colours are only worth having if you know what they mean, and the one
+ * you have to look up is the one you are about to draw wrong.
+ */
+function renderTypeKey() {
+  const key = el("typeKey");
+  if (!key) return;
+  const counts = {};
+  for (const r of rooms) {
+    if (r.kind !== "polygon" || onHiddenFloor(r)) continue;
+    counts[r.type || "room"] = (counts[r.type || "room"] || 0) + 1;
+  }
+  key.innerHTML = Object.entries(SPACE_COLOURS)
+    // only what is actually on this floor: a key to colours that are not
+    // there is a list to read past
+    .filter(([type]) => counts[type])
+    .map(([type, c]) => `<li><i style="background:${c.fill};border-color:${c.line}"></i>`
+      + `${esc(outlineTypeLabel(type))} <b>${counts[type]}</b></li>`)
+    .join("");
+}
+
 function renderZoneKey() {
   const key = el("zoneKey");
   if (!key) return;
@@ -1557,15 +1926,68 @@ function autoNameNodes() {
   let named = 0;
   let already = 0;
   let outside = 0;
+  let elsewhere = 0;
 
   for (const r of rooms) {
     if (r.kind !== "point" || r.type !== "node") continue;
     if (r.room) { already += 1; continue; }
+    // The outlines being measured against are the open sheet's, so this can
+    // only answer for nodes on that floor. Without the check, opening floor 2
+    // handed floor-2 room numbers to nodes recorded as being on floor 1 --
+    // they sit at the same place on the ground, so every one of them is
+    // "inside" a room on the floor above.
+    if (onOtherFloor(r)) { elsewhere += 1; continue; }
     const found = roomAtUv(itemUv(r));
-    if (found) { r.room = found; named += 1; } else { outside += 1; }
+    if (!found) { outside += 1; continue; }
+    r.room = found;
+    // It stands in a room on this sheet, so it is on this floor -- which it
+    // may never have been told if it was placed while another was open.
+    if (r.floor == null || r.floor === "") r.floor = current?.floor ?? null;
+    named += 1;
   }
   if (named) { redrawRooms(); markDirty(); }
-  return { named, already, outside };
+  return { named, already, outside, elsewhere };
+}
+
+/**
+ * Give every unnamed node a name from the convention.
+ *
+ * It only ever fills in blanks. A name already on a node was either put there
+ * by this and is still right, or was typed by somebody -- and there is no way
+ * to tell those apart that is worth being wrong about, so neither is
+ * overwritten. Renaming one is editing it, which the details dialog does.
+ *
+ * Room nodes are named first: SW3-1615 has to be free for the node that
+ * actually serves 1615, and a numbered node would otherwise have taken it.
+ */
+function nameNodes() {
+  const nodes = rooms.filter((r) => r.type === "node" && r.nid);
+  const used = usedNodeNames();
+  // Nothing to be called; or called after a number only because it had no
+  // room at the time, and now it has one.
+  const blank = nodes.filter((r) => !r.name);
+  const stale = nodes.filter((r) => r.name && spareNameStale(r));
+  const todo = [...blank, ...stale];
+  let named = 0;
+  let renamed = 0;
+
+  for (const pass of [todo.filter((r) => r.room), todo.filter((r) => !r.room)]) {
+    for (const r of pass) {
+      // Its own name is not a name it collides with: without this, a node
+      // being looked at again is pushed off the name it already holds and
+      // onto the next free one.
+      if (r.name) used.delete(String(r.name));
+      const name = freeNodeName(r, used);
+      used.add(name || String(r.name));
+      if (!name || name === r.name) continue;
+      if (r.name) renamed += 1; else named += 1;
+      r.name = name;
+    }
+  }
+  if (named || renamed) { redrawRooms(); markDirty(); }
+  return {
+    named, renamed, already: nodes.length - todo.length, total: nodes.length,
+  };
 }
 
 /**
@@ -1598,6 +2020,415 @@ function tidyLinks() {
   const removed = duplicates + selfLinks + dangling;
   if (removed) { selected = -1; redrawRooms(); markDirty(); }
   return { duplicates, selfLinks, dangling, removed };
+}
+
+// ---------------------------------------------------------------------------
+// Connecting two buildings
+//
+// The campus network only routes between two buildings if some link actually
+// crosses from one to the other, and nothing places that link for you: SW3
+// and SE12 share a wall, but until a node on one side is joined to a node on
+// the other the router thinks you have to walk round.
+//
+// Making that link by clicking was the problem: both dots are in view, they
+// are metres apart, and they look identical to the six hundred others -- so
+// you click, miss, and quietly join the wrong pair.
+//
+// The answer is not to guess the pair for you. Which two nodes to join is a
+// judgement about the building -- which corridor actually runs on into the
+// next one, which door is the one people use -- and the nearest two nodes are
+// not reliably that. So this tool does the part that was in the way and none
+// of the part that was yours: you name the two floors, both floor plans are
+// drawn in full, every node that is not on one of them comes off the map, and
+// then you click the two you meant. What is left to click is only ever the
+// two floors you are joining.
+// ---------------------------------------------------------------------------
+
+// Nodes on the paths across campus belong to no building, and joining a
+// building to those paths is the same job as joining it to its neighbour --
+// so outdoors is offered as a place like any other. A real building can never
+// be called this, so it cannot collide with one.
+const OUTDOORS_PLACE = "__outdoors__";
+const placeLabel = (place) => (place === OUTDOORS_PLACE ? "Outdoors" : place);
+
+/** Metres between two world positions, near enough at campus scale. */
+function metresBetween(a, b) {
+  const dx = (b[0] - a[0]) * mPerDegLng((a[1] + b[1]) / 2);
+  const dy = (b[1] - a[1]) * mPerDegLat();
+  return Math.hypot(dx, dy);
+}
+
+const nodePlace = (r) => (r.building ? String(r.building) : OUTDOORS_PLACE);
+
+/**
+ * Every place that has nodes in it, with how many, ordered for the pickers.
+ *
+ * Built from the nodes rather than from the campus outlines: a building with
+ * nothing traced in it has nothing to link to, and offering it would be
+ * offering a connection that cannot be made.
+ */
+function placesWithNodes() {
+  const counts = new Map();
+  for (const r of rooms) {
+    if (r.type !== "node" || !r.nid) continue;
+    const place = nodePlace(r);
+    counts.set(place, (counts.get(place) || 0) + 1);
+  }
+  return [...counts.entries()]
+    // outdoors last: it is the odd one out, and it is not what you are
+    // usually looking for in this list
+    .sort(([a], [b]) => Number(a === OUTDOORS_PLACE) - Number(b === OUTDOORS_PLACE)
+      || NAME_ORDER.compare(a, b))
+    .map(([place, count]) => ({ place, count }));
+}
+
+const samePlace = (a, b) => String(a).toUpperCase() === String(b).toUpperCase();
+
+/** The traced sheets of a building, lowest floor first. */
+const tracedSheets = (place) => plans
+  .filter((pl) => pl.traced && samePlace(pl.building, place))
+  .sort((a, b) => Number(a.floor) - Number(b.floor));
+
+/**
+ * Is this node on the floor chosen for its end of the link?
+ *
+ * A blank choice means every floor, and so does a node that is on none. A
+ * node standing at SE12's door was placed while SW3 was the open sheet, so it
+ * carries no floor of its own -- and it is exactly the node an internal
+ * connection wants, so it must not be filtered out by the floor it lacks.
+ */
+const onChosenFloor = (r, floor) => !floor
+  || r.floor == null || r.floor === ""
+  || String(r.floor) === String(floor);
+
+const nodesInPlace = (place, floor) => rooms.filter(
+  (r) => r.type === "node" && r.nid && nodePlace(r) === place
+    && onChosenFloor(r, floor),
+);
+
+const metresText = (d) => (d < 10 ? `${d.toFixed(1)} m` : `${Math.round(d)} m`);
+
+function setBridgeHint(text) {
+  el("bridgeHint").textContent = text;
+}
+
+/**
+ * The sheets whose floor plans should be on show, in full, while the tool is
+ * open -- one per end, minus whichever is already open for editing.
+ *
+ * Two buildings that touch are joined INSIDE: a door through a shared wall,
+ * a corridor that runs on. Placing that link means reading both floors at
+ * once, and the other one was grey context with every one of its storeys
+ * drawn on top of each other. So the floor at each end is drawn properly and
+ * the rest of those two buildings goes away.
+ */
+function bridgeSheets() {
+  const sheets = new Set();
+  if (!bridgeEnds) return sheets;
+  for (const [place, floor] of [[bridgeEnds.from, bridgeEnds.fromFloor],
+    [bridgeEnds.to, bridgeEnds.toFloor]]) {
+    const on = tracedSheets(place);
+    // With no floor named there is no one sheet to show: "every floor of
+    // SE12 at once" is the picture this is trying to get rid of.
+    const sheet = floor ? on.find((pl) => String(pl.floor) === String(floor)) : null;
+    if (sheet && sheet.stem !== current?.stem) sheets.add(sheet.stem);
+  }
+  return sheets;
+}
+
+/** Fill one floor picker for the place chosen beside it. */
+function fillFloorPicker(selectId, fieldId, place, prefer) {
+  const sel = el(selectId);
+  const sheets = place ? tracedSheets(place) : [];
+  // Nothing traced there -- a car park, or a building nobody has drawn yet.
+  // There is no floor to pick, and saying so with an empty picker would be
+  // asking a question that has no answers.
+  el(fieldId).hidden = sheets.length === 0;
+  if (!sheets.length) { sel.innerHTML = ""; return; }
+  const keep = sel.value;
+  sel.innerHTML = sheets
+    .map((pl) => `<option value="${esc(pl.floor)}">Floor ${esc(pl.floor)}</option>`)
+    .join("") + '<option value="">Any floor</option>';
+  const has = (f) => f !== undefined && f !== null
+    && sheets.some((pl) => String(pl.floor) === String(f));
+  // Keep what was chosen; otherwise the floor you are on, because two
+  // buildings that touch almost always touch on the same storey.
+  if (has(keep)) sel.value = keep;
+  else if (has(prefer)) sel.value = String(prefer);
+  else sel.value = String(sheets[0].floor);
+}
+
+/** Both floor pickers, from whichever places are chosen. */
+function refreshBridgeFloors() {
+  const here = current ? current.floor : null;
+  fillFloorPicker("bridgeFromFloor", "bridgeFromFloorField", el("bridgeFrom").value, here);
+  fillFloorPicker("bridgeToFloor", "bridgeToFloorField", el("bridgeTo").value, here);
+}
+
+/**
+ * Fill the two place pickers, keeping whatever was already chosen.
+ *
+ * Called whenever the tool is opened rather than once at startup, because
+ * placing a node in a building that had none makes it a place you can link
+ * to, and the list has to say so without a reload.
+ */
+function refreshBridgePlaces() {
+  const places = placesWithNodes();
+  for (const id of ["bridgeFrom", "bridgeTo"]) {
+    const sel = el(id);
+    const keep = sel.value;
+    sel.innerHTML = ['<option value="">— pick a place —</option>']
+      .concat(places.map(({ place, count }) => `<option value="${esc(place)}">`
+        + `${esc(placeLabel(place))} (${count})</option>`))
+      .join("");
+    // The chosen place survives a refresh; one that has lost all its nodes
+    // cannot, and falls back to nothing chosen rather than to the wrong place.
+    sel.value = places.some((pl) => pl.place === keep) ? keep : "";
+  }
+  // The building you have open is almost always one end of the link, so it is
+  // filled in -- but only if you have not already said otherwise.
+  const here = current && places.find(
+    (pl) => samePlace(pl.place, current.building),
+  );
+  if (here && !el("bridgeFrom").value) el("bridgeFrom").value = here.place;
+  refreshBridgeFloors();
+  syncBridgeSheets();
+}
+
+/**
+ * Take up what the pickers now say.
+ *
+ * Which two floors are being joined decides three things at once -- which
+ * floor plans are drawn, which nodes are on the map at all, and what the
+ * hint says -- so they are all done from here and nowhere else.
+ */
+function syncBridgeSheets() {
+  setBridgeEnds(readBridgePickers());
+  if (draft) cancelDraft();      // the ends moved; a half-made link is stale
+  drawOverview();
+  redrawRooms();
+  describeBridge();
+}
+
+/** Which end of the link this node is at, or null if it is at neither. */
+function bridgeEndOf(r) {
+  if (!bridgeEnds || r.type !== "node" || !r.nid) return null;
+  const place = nodePlace(r);
+  if (place === bridgeEnds.from && onChosenFloor(r, bridgeEnds.fromFloor)) return "from";
+  if (place === bridgeEnds.to && onChosenFloor(r, bridgeEnds.toFloor)) return "to";
+  return null;
+}
+
+/** Is this node one of the two floors being joined? */
+const atBridgeEnd = (r) => bridgeEndOf(r) !== null;
+
+/** What the pickers say, read off the page. */
+function readBridgePickers() {
+  const from = el("bridgeFrom").value;
+  const to = el("bridgeTo").value;
+  if (!from || !to || from === to) return null;
+  return {
+    from,
+    to,
+    // "" means every floor, which is all a car park or an untraced building
+    // can mean
+    fromFloor: el("bridgeFromFloor").value,
+    toFloor: el("bridgeToFloor").value,
+  };
+}
+
+/**
+ * The two ends currently being worked between, or null when the tool is shut.
+ *
+ * Cached rather than read from the pickers on demand, because onHiddenFloor()
+ * consults it for every node on every redraw -- eight thousand DOM reads a
+ * frame is not a thing to do for an answer that only changes when someone
+ * touches a picker.
+ */
+function setBridgeEnds(next) {
+  bridgeEnds = next;
+}
+
+/** A place and the floor of it being worked with: "SE12 floor 2". */
+const endLabel = (place, floor) =>
+  `${placeLabel(place)}${floor ? ` floor ${floor}` : ""}`;
+
+const fromLabel = () => endLabel(bridgeEnds.from, bridgeEnds.fromFloor);
+const toLabel = () => endLabel(bridgeEnds.to, bridgeEnds.toFloor);
+
+/** How many nodes are left to choose between at each end. */
+const endCount = (place, floor) => nodesInPlace(place, floor).length;
+
+/**
+ * Which floor plans are actually on the map, said out loud.
+ *
+ * The floors on show are the whole point of choosing them, so a floor that
+ * cannot be shown has to be said rather than left as an empty patch of map
+ * where a plan was expected. There are two ways to end up with nothing: the
+ * place has never been traced, or "any floor" was chosen -- and "any floor"
+ * cannot be drawn, because every storey of a building sits on the same ground
+ * and drawing them all is the heap this was built to get rid of.
+ */
+function showingText() {
+  if (!bridgeEnds) return "";
+  const sheets = bridgeSheets();
+  const untraced = [];
+  const unchosen = [];
+  for (const [place, floor] of [[bridgeEnds.from, bridgeEnds.fromFloor],
+    [bridgeEnds.to, bridgeEnds.toFloor]]) {
+    const on = tracedSheets(place);
+    if (!on.length) {
+      // outdoors is not a building and was never going to have a plan, so
+      // saying it has none is noise
+      if (place !== OUTDOORS_PLACE) untraced.push(placeLabel(place));
+      continue;
+    }
+    const sheet = on.find((pl) => String(pl.floor) === String(floor));
+    if (!sheet) { unchosen.push(placeLabel(place)); continue; }
+    if (!sheets.has(sheet.stem) && sheet.stem !== current?.stem) unchosen.push(placeLabel(place));
+  }
+  const said = [];
+  if (untraced.length) {
+    said.push(`No floor plan traced for ${untraced.join(" or ")}, so only its nodes are drawn.`);
+  }
+  if (unchosen.length) {
+    said.push(`Pick a floor for ${unchosen.join(" and ")} to see its plan.`);
+  }
+  return said.length ? ` ${said.join(" ")}` : " Both floor plans are drawn.";
+}
+
+/** Say what is on show and what to do with it. */
+function describeBridge() {
+  if (!el("bridgeFrom").value || !el("bridgeTo").value) {
+    setBridgeHint("Pick the two places you want someone to be able to walk between.");
+    return;
+  }
+  if (el("bridgeFrom").value === el("bridgeTo").value) {
+    setBridgeHint("Pick two different places — this joins one to another.");
+    return;
+  }
+  if (!bridgeEnds) return;
+  const a = endCount(bridgeEnds.from, bridgeEnds.fromFloor);
+  const b = endCount(bridgeEnds.to, bridgeEnds.toFloor);
+  setBridgeHint(`${fromLabel()} has ${a} node${a === 1 ? "" : "s"}, `
+    + `${toLabel()} has ${b}. Everything else is off the map.${showingText()}`
+    + " Click Link Nodes, then a node on each side.");
+}
+
+/** A box round everything drawn on one sheet, or null if it is empty. */
+function sheetBounds(stem) {
+  const b = { x0: 180, y0: 90, x1: -180, y1: -90 };
+  let any = false;
+  const eat = ([x, y]) => {
+    any = true;
+    b.x0 = Math.min(b.x0, x); b.y0 = Math.min(b.y0, y);
+    b.x1 = Math.max(b.x1, x); b.y1 = Math.max(b.y1, y);
+  };
+  if (stem && stem === current?.stem) {
+    // the open sheet is not in the overview -- it is what you are drawing
+    for (const r of rooms) {
+      if (r.kind === "polygon") r.uv.map(uvToLngLat).forEach(eat);
+    }
+  } else {
+    for (const f of overviewFeatures) {
+      if (f.properties.stem !== stem) continue;
+      if (f.geometry?.type === "Polygon") f.geometry.coordinates[0].forEach(eat);
+      else if (f.geometry?.type === "Point") eat(f.geometry.coordinates);
+    }
+  }
+  return any ? b : null;
+}
+
+/** Fit the map round the given world boxes, ignoring the empty ones. */
+function fitBoxes(boxes) {
+  const real = boxes.filter(Boolean);
+  if (!real.length) return false;
+  map.fitBounds([
+    [Math.min(...real.map((b) => b.x0)), Math.min(...real.map((b) => b.y0))],
+    [Math.max(...real.map((b) => b.x1)), Math.max(...real.map((b) => b.y1))],
+  ], { padding: 60, maxZoom: 19.5, duration: 600 });
+  return true;
+}
+
+/**
+ * Both floors on screen at once.
+ *
+ * The whole of each, not the doorway between them: an internal connection is
+ * placed by reading the two plans against each other -- where the corridor on
+ * one side lines up with the corridor on the other -- and that is not a
+ * question you can answer zoomed in on two dots.
+ */
+function showBothFloors() {
+  if (!bridgeEnds) {
+    describeBridge();
+    return;
+  }
+  const stems = [...bridgeSheets()];
+  if (current?.stem) stems.push(current.stem);
+  if (fitBoxes(stems.map(sheetBounds))) return;
+  // Nothing traced at either end, so there is no floor plan to frame. The
+  // nodes on show are all there is, and they are still worth looking at.
+  const shown = [...nodesInPlace(bridgeEnds.from, bridgeEnds.fromFloor),
+    ...nodesInPlace(bridgeEnds.to, bridgeEnds.toFloor)]
+    .map(itemLngLat).filter(Boolean);
+  if (!shown.length) { describeBridge(); return; }
+  fitBoxes([{
+    x0: Math.min(...shown.map((c) => c[0])), y0: Math.min(...shown.map((c) => c[1])),
+    x1: Math.max(...shown.map((c) => c[0])), y1: Math.max(...shown.map((c) => c[1])),
+  }]);
+}
+
+/**
+ * One click of the two that make a link between the floors.
+ *
+ * The same two-click act as the ordinary link tool, and it makes the same
+ * ordinary link -- two node ids and the fact that they join. What is
+ * different is what can be clicked: only the two floors are on the map, so a
+ * miss lands on nothing rather than on a node in another building.
+ */
+function bridgeClick(lngLat) {
+  const node = nodeNear(lngLat);
+  if (!node) {
+    setDrawHint(`Click directly on a node. Only ${fromLabel()} and ${toLabel()} `
+      + "are on the map — everything else is hidden while you join these two.");
+    return;
+  }
+  const end = bridgeEndOf(node);
+  const first = draft.length ? nodeById(draft[0]) : null;
+  if (!first) {
+    draft.push(node.nid);
+    const other = end === "from" ? toLabel() : fromLabel();
+    setDrawHint(`From ${whereIs(node)}. Now click the node in ${other} to join it to.`);
+    return;
+  }
+  if (first.nid === node.nid) {
+    setDrawHint("Pick a different node for the other end.");
+    return;
+  }
+  // Both ends in the same place is not the link this tool is for, and it is
+  // the mistake the tool exists to catch: it means the wrong dot was hit.
+  if (bridgeEndOf(first) === end) {
+    setDrawHint(`Both of those are in ${endLabel(nodePlace(node),
+      end === "from" ? bridgeEnds.fromFloor : bridgeEnds.toFloor)}. `
+      + "The second node has to be on the other side.");
+    return;
+  }
+  // Clicking a pair that is already joined removes the link -- the tool for
+  // making links is where you look when you want to unmake one.
+  const existing = rooms.findIndex((r) => r.kind === "path"
+    && r.nodes.includes(first.nid) && r.nodes.includes(node.nid));
+  if (existing >= 0) rooms.splice(existing, 1);
+  else rooms.push({ kind: "path", nodes: [first.nid, node.nid] });
+  forgetNodeIndex();
+  draft = [];
+  selected = -1;
+  redrawRooms();
+  markDirty();
+  const apart = metresText(metresBetween(itemLngLat(first), itemLngLat(node)));
+  const joined = `${whereIs(first)} ↔ ${whereIs(node)}`;
+  setDrawHint(existing >= 0
+    ? `Unlinked ${joined}. Click the same two again to put it back.`
+    : `Joined ${joined}, ${apart} apart. Click another pair, or Done.`);
 }
 
 const outlineLabel = (r) => (r.room ? `${r.room} (${r.type})` : `unnumbered ${r.type}`);
@@ -1671,13 +2502,19 @@ function configureDialog(item) {
   // a doorway and a walking node are positions, not numbered spaces
   el("roomField").hidden = isDoor || isNode;
   el("roomFieldLabel").textContent = isEntrance ? "Name" : "Room Number";
-  el("nameField").hidden = isMarker;
+  // A node's name is its handle -- it is what the list, the map label and the
+  // filter box all show -- so it has to be editable. A doorway has no name of
+  // its own; it is described by what it joins.
+  el("nameField").hidden = isMarker && !isNode;
+  if (isNode) {
+    el("roomForm").name.placeholder = freeNodeName(item, usedNodeNames()) || "SW3-1615";
+  }
 
   const saveBtn = el("roomForm").querySelector('button[type="submit"]');
   if (saveBtn) saveBtn.textContent = isMarker ? "Save" : "Save Room";
 
   el("roomDialogTitle").textContent =
-    isNode ? "Path Node"
+    isNode ? (item.name || "Path Node")
       : isDoor ? "Doorway"
         : isEntrance ? "Building Entrance"
           : (item.room ? `Room ${item.room}` : "New Room");
@@ -1791,6 +2628,9 @@ function closeDialog() {
 // Saving
 // ---------------------------------------------------------------------------
 function markDirty() {
+  // Editing may have drawn, moved or deleted an outline, and where the
+  // outlines are is what decides whether a node is inside one.
+  forgetShapeIndex();
   dirty = true;
   el("saveState").textContent = "unsaved changes";
 }
@@ -2004,6 +2844,11 @@ async function saveNetwork() {
 
 async function savePlacement() {
   if (!current || !placement) return;
+  // Nothing has moved, so there is nothing to say. Writing anyway is how a
+  // placement that was never touched gets a new timestamp -- or, when the
+  // page is briefly between two sheets, gets written under the wrong name.
+  if (!placementMoved) return;
+  placementMoved = false;
   await fetch(`/admin/api/placement/${current.building}/${current.floor}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
@@ -2045,6 +2890,7 @@ async function loadNetwork() {
         room: p.room || null,
         building: p.building || null,
         floor: p.floor || null,
+        name: p.name || undefined,
       });
     } else if (p.type === "path" && Array.isArray(p.nodes) && p.nodes.length === 2) {
       out.push({ kind: "path", nodes: p.nodes });
@@ -2053,25 +2899,44 @@ async function loadNetwork() {
   return out;
 }
 
+// Which attempt to open a floor is the current one. See loadPlan().
+let planLoadSeq = 0;
+
 async function loadPlan(stem) {
   if (dirty && !confirm("This floor has unsaved changes. Leave anyway?")) return;
-  current = plans.find((p) => p.stem === stem);
-  if (!current) return;
+  const sheet = plans.find((p) => p.stem === stem);
+  if (!sheet) return;
 
+  // Opening a floor is several awaits long: `current` is set at the top and
+  // `rooms` only replaced at the bottom. Two of these running at once -- the
+  // remembered floor reopening while you pick another, or a second pick
+  // before the first has landed -- interleave, and the tracer ends up saying
+  // it has one sheet open while holding another's outlines. That is not just
+  // a confusing picture: saving writes `rooms` to `current`, so it would put
+  // one floor's rooms into another floor's file. Each attempt takes a ticket
+  // and stands down the moment a newer one starts.
+  const mine = planLoadSeq + 1;
+  planLoadSeq = mine;
+  const superseded = () => planLoadSeq !== mine;
+
+  current = sheet;
   let data;
   try {
-    data = await fetchJson(`/admin/api/floor/${current.building}/${current.floor}`);
+    data = await fetchJson(`/admin/api/floor/${sheet.building}/${sheet.floor}`);
   } catch (err) {
-    el("planStatus").textContent = err.message;
+    if (!superseded()) el("planStatus").textContent = err.message;
     return;
   }
+  if (superseded()) return;
   placement = data.placement || null;
+  placementMoved = false;   // this is what the file already says
 
   ensureLayers();
   let fitted = false;
   if (!placement) {
     placement = { lng: BCIT.lng, lat: BCIT.lat, widthM: 100, rotation: 0 };
     fitted = await fitToBuilding();
+    if (superseded()) return;
   }
 
   // Rooms saved by this tool carry their plan-space outline, so they come back
@@ -2083,6 +2948,7 @@ async function loadPlan(stem) {
   // whichever sheet you open -- so you can trace a path from a door, out
   // across the grass, to the door of the next building.
   const [network] = await Promise.all([loadNetwork(), campus.length ? null : loadCampus()]);
+  if (superseded()) return;
 
   forgetNodeIndex();
   rooms = (data.featureCollection?.features || [])
@@ -2114,6 +2980,7 @@ async function loadPlan(stem) {
 
   dirty = false;
   selected = -1;
+  forgetShapeIndex();   // a different sheet is open, so different outlines apply
   el("saveState").textContent = "";
   applyPlacement();
   redrawRooms();
@@ -2153,6 +3020,79 @@ function drawOverview() {
   // the overview is fetched independently of the map style, so its layers may
   // not exist yet
   whenStyleReady(ensureLayers);
+  const src = map.getSource(OVERVIEW_SRC);
+  if (!src) return whenStyleReady(drawOverview);
+  const skip = current?.stem;
+  // The sheets being read alongside the one open, because a link is being
+  // made between them. Drawn in full; and since a building's storeys sit on
+  // top of one another, the rest of THEIR buildings comes off -- otherwise
+  // "show me SE12 floor 2" is SE12 floors 2 and 3 in a heap.
+  const companions = bridgeSheets();
+  const claimed = new Set();
+  for (const stem of companions) {
+    const sheet = plans.find((pl) => pl.stem === stem);
+    if (sheet) claimed.add(String(sheet.building).toUpperCase());
+  }
+  // Sheets showing only part of themselves, because the floor they are on is
+  // not the one open. They get no label: "SW5 · Floor 1" written across two
+  // stairwells says a whole floor is drawn there when it is not.
+  const partial = new Set();
+  const shown = overviewFeatures.filter((f) => {
+    if (f.properties.stem === skip) return false;
+    if (companions.has(f.properties.stem)) return true;
+    // A different floor of a building whose floor is being shown in full:
+    // it would sit over the plan that was asked for.
+    if (claimed.has(String(f.properties.building || "").toUpperCase())) {
+      partial.add(f.properties.stem);
+      return false;
+    }
+    // Another floor of this building is drawn on top of the sheet being
+    // traced, which is the whole reason for hiding it; its stairwells stay,
+    // because that is what the floor above lines up against.
+    if (onHiddenFloor(f.properties)) {
+      partial.add(f.properties.stem);
+      return false;
+    }
+    return true;
+  });
+
+  // A label per sheet, placed in the middle of what has been traced on it.
+  const bounds = new Map();
+  for (const f of shown) {
+    if (f.geometry?.type !== "Polygon") continue;
+    const stem = f.properties.stem;
+    if (partial.has(stem) && !companions.has(stem)) continue;
+    const b = bounds.get(stem) || { x0: 180, y0: 90, x1: -180, y1: -90 };
+    for (const [x, y] of f.geometry.coordinates[0]) {
+      b.x0 = Math.min(b.x0, x); b.y0 = Math.min(b.y0, y);
+      b.x1 = Math.max(b.x1, x); b.y1 = Math.max(b.y1, y);
+    }
+    bounds.set(stem, b);
+  }
+  const labels = [...bounds.entries()].map(([stem, b]) => ({
+    type: "Feature",
+    properties: {
+      stem,
+      kind: "sheet-label",
+      // "SW3-Floor1" is a file name; "SW3 · Floor 1" is what it is
+      label: stem.replace(/-Floor/, " · Floor "),
+    },
+    geometry: { type: "Point", coordinates: [(b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2] },
+  }));
+
+  const tagged = companions.size
+    ? shown.map((f) => (companions.has(f.properties.stem)
+      ? { ...f, properties: { ...f.properties, companion: true } }
+      : f))
+    : shown;
+  const taggedLabels = companions.size
+    ? labels.map((f) => (companions.has(f.properties.stem)
+      ? { ...f, properties: { ...f.properties, companion: true } }
+      : f))
+    : labels;
+  src.setData({ type: "FeatureCollection", features: [...tagged, ...taggedLabels] });
+}
+
 loadCampus();   // the campus is context for everything, so it loads up front
 
 /**
@@ -2172,51 +3112,6 @@ loadCampus();   // the campus is context for everything, so it loads up front
   setMode(mode);
   redrawRooms();
 })();
-  const src = map.getSource(OVERVIEW_SRC);
-  if (!src) return whenStyleReady(drawOverview);
-  const skip = current?.stem;
-  // Sheets showing only part of themselves, because the floor they are on is
-  // not the one open. They get no label: "SW5 · Floor 1" written across two
-  // stairwells says a whole floor is drawn there when it is not.
-  const partial = new Set();
-  const shown = overviewFeatures.filter((f) => {
-    if (f.properties.stem === skip) return false;
-    // Another floor of this building is drawn on top of the sheet being
-    // traced, which is the whole reason for hiding it; its stairwells stay,
-    // because that is what the floor above lines up against.
-    if (onHiddenFloor(f.properties)) {
-      partial.add(f.properties.stem);
-      return false;
-    }
-    return true;
-  });
-
-  // A label per sheet, placed in the middle of what has been traced on it.
-  const bounds = new Map();
-  for (const f of shown) {
-    if (f.geometry?.type !== "Polygon") continue;
-    const stem = f.properties.stem;
-    if (partial.has(stem)) continue;
-    const b = bounds.get(stem) || { x0: 180, y0: 90, x1: -180, y1: -90 };
-    for (const [x, y] of f.geometry.coordinates[0]) {
-      b.x0 = Math.min(b.x0, x); b.y0 = Math.min(b.y0, y);
-      b.x1 = Math.max(b.x1, x); b.y1 = Math.max(b.y1, y);
-    }
-    bounds.set(stem, b);
-  }
-  const labels = [...bounds.entries()].map(([stem, b]) => ({
-    type: "Feature",
-    properties: {
-      stem,
-      kind: "sheet-label",
-      // "SW3-Floor1" is a file name; "SW3 · Floor 1" is what it is
-      label: stem.replace(/-Floor/, " · Floor "),
-    },
-    geometry: { type: "Point", coordinates: [(b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2] },
-  }));
-
-  src.setData({ type: "FeatureCollection", features: [...shown, ...labels] });
-}
 
 /**
  * The floor picker, with a tick beside every sheet that has something on it.
@@ -2270,6 +3165,7 @@ async function loadOverview() {
     }
   }));
   overviewFeatures = results.flat();
+  forgetShapeIndex();
   // Every sheet has now been read, which is the only place the type of a
   // space on a floor that is not open can be found -- so a node standing in
   // the stairwell of the floor below can be recognised as one.
@@ -2596,6 +3492,7 @@ function normaliseAngle(deg) {
 }
 
 function changePlacement(fn) {
+  placementMoved = true;
   if (!placement) return;
   fn(placement);
   applyPlacement();
@@ -2653,9 +3550,12 @@ const beginDrawing = () => {
   const t = activeType();
   setDrawHint(
     t === "node" ? "Click to drop a node. Keep clicking to place more."
-      : isLinkType(t) ? "Click one node, then the node to link it to."
-        : isPointType(t) ? "Click where the door or entrance is."
-          : "Click each corner, then Finish. Double-click also closes it.");
+      : isBridgeType(t) ? (bridgeEnds
+        ? `Click a node in ${fromLabel()}, then the node in ${toLabel()} to join them.`
+        : "Pick a place and a floor at each end first.")
+        : isLinkType(t) ? "Click one node, then the node to link it to."
+          : isPointType(t) ? "Click where the door or entrance is."
+            : "Click each corner, then Finish. Double-click also closes it.");
 };
 
 el("startDraw").addEventListener("click", beginDrawing);
@@ -2677,13 +3577,58 @@ function networkButtonLabel() {
   const t = activeType();
   if (t === "node") return "Place Nodes";
   if (isLinkType(t)) return "Link Nodes";
+  if (isBridgeType(t)) return "Connect Buildings";
   return isPointType(t) ? "Place Marker" : "Draw";
 }
 
-el("netType").addEventListener("change", () => {
+/**
+ * Show the controls belonging to the network tool that is chosen.
+ *
+ * The two clicking tools want a Draw button and a hint about where to click;
+ * connecting two buildings wants neither, because it is answered by naming
+ * places. Both on screen at once is two sets of instructions for one task.
+ */
+function syncNetTool() {
+  const bridge = mode === "network" && isBridgeType(activeType());
+  el("bridgeFields").hidden = !bridge;
+  el("netDrawRow").hidden = bridge;
+  el("netHint").hidden = bridge;
   el("startNetDraw").textContent = networkButtonLabel();
+  // Rebuilt on opening rather than kept up to date: a place becomes linkable
+  // the moment it has a node, and this is the only moment that matters.
+  if (bridge) { refreshBridgePlaces(); return; }
+  // Leaving the tool puts the campus back: every node returns to the map and
+  // the two full-colour sheets come off. They are there to make a link, not
+  // to become the way the map looks.
+  setBridgeEnds(null);
+  drawOverview();
+  redrawRooms();
+  // and the floor plan goes back to being context for the network
+  applyModeStyling();
+}
+
+el("netType").addEventListener("change", () => {
+  syncNetTool();
   if (draft) cancelDraft();
 });
+
+// Changing a place changes which floors it has; changing either changes
+// which two floor plans should be on the map.
+for (const id of ["bridgeFrom", "bridgeTo"]) {
+  el(id).addEventListener("change", () => {
+    refreshBridgeFloors();
+    syncBridgeSheets();
+  });
+}
+for (const id of ["bridgeFromFloor", "bridgeToFloor"]) {
+  el(id).addEventListener("change", syncBridgeSheets);
+}
+el("bridgeStart").addEventListener("click", beginDrawing);
+el("bridgeDone").addEventListener("click", () => {
+  cancelDraft();
+  setDrawHint("Done linking. Click Link Nodes to join another pair.");
+});
+el("bridgeShow").addEventListener("click", showBothFloors);
 
 el("drawType").addEventListener("change", () => {
   el("startDraw").textContent = networkButtonLabel();
@@ -2704,15 +3649,39 @@ function showToolResult(text) {
 }
 
 el("autoName").addEventListener("click", () => {
-  // nodes now take a room as they are placed, so this is for the ones that
-  // predate that, or that were placed before their room was traced
-  const { named, already, outside } = autoNameNodes();
-  showToolResult(named
-    ? `Named ${named} node${named === 1 ? "" : "s"} from the room each sits in.`
-      + (outside ? ` ${outside} sit outside any numbered outline.` : "")
-    : already
-      ? "Every node already names a room."
-      : "No node sits inside a numbered outline — trace the rooms first.");
+  // Which room a node serves first, then what it is called -- the name is
+  // built out of the room, so doing it the other way round would name a node
+  // after a room it had not been given yet.
+  const rooms_ = autoNameNodes();
+  const names_ = nameNodes();
+  const said = [];
+  if (rooms_.named) {
+    said.push(`Matched ${rooms_.named} node${rooms_.named === 1 ? "" : "s"} `
+      + "to the room each sits in.");
+  }
+  if (names_.named) {
+    said.push(`Named ${names_.named} node${names_.named === 1 ? "" : "s"} — `
+      + "building and room, building floor and an H number, or a count outside.");
+  }
+  if (names_.renamed) {
+    said.push(`Renamed ${names_.renamed} whose H number no longer said `
+      + "where they are.");
+  }
+  // Said out loud, because it is why fewer were matched than you might have
+  // counted on the map: they belong to a floor that is not open, and only
+  // that sheet's outlines can say which room they are in.
+  if (rooms_.elsewhere) {
+    said.push(`${rooms_.elsewhere} sit on other floors — open those sheets `
+      + "to match them.");
+  }
+  if (!said.length) {
+    said.push(names_.total
+      ? `All ${names_.total} nodes are already named.`
+      : "There are no nodes yet.");
+  } else if (names_.already && (names_.named || names_.renamed)) {
+    said.push(`${names_.already} already had a name and were left alone.`);
+  }
+  showToolResult(said.join(" "));
 });
 
 el("tidyLinks").addEventListener("click", () => {

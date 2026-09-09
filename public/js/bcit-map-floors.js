@@ -1,4 +1,6 @@
 // public/js/bcit-map-floors.js
+import { byType } from "./space-colours.js";
+
 (function () {
   window.BCITMapPlugins = window.BCITMapPlugins || [];
   window.BCITMapPlugins.push(function attachBuildingFloors(map, utils) {
@@ -266,30 +268,8 @@
       }
     };
 
-    /**
-     * A colour per kind of space.
-     *
-     * Warm means somewhere you can be sent; everything else is cooler and
-     * sits back. Beyond that the point is telling them apart at a glance: a
-     * stairwell should not have to be read to be recognised. Kept in one
-     * table so the fill, the outline, the label and anything added later
-     * cannot drift apart.
-     */
-    const SPACE_COLOURS = {
-      room:     { fill: "#fb923c", line: "#b91c1c", opacity: 0.65, label: "#7c2d12" },
-      hallway:  { fill: "#cbd5e1", line: "#94a3b8", opacity: 0.5, label: "#475569" },
-      service:  { fill: "#a8a29e", line: "#78716c", opacity: 0.45, label: "#57534e" },
-      stairs:   { fill: "#6ee7b7", line: "#059669", opacity: 0.7, label: "#065f46" },
-      elevator: { fill: "#c4b5fd", line: "#7c3aed", opacity: 0.7, label: "#5b21b6" },
-    };
-    const DEFAULT_SPACE = SPACE_COLOURS.room;
-
-    /** A Mapbox match expression over the table above. */
-    const byType = (field) => [
-      "match", ["get", "type"],
-      ...Object.entries(SPACE_COLOURS).flatMap(([type, c]) => [type, c[field]]),
-      DEFAULT_SPACE[field],
-    ];
+    // The colours themselves are in space-colours.js, because the tracer
+    // draws these same floors and has to draw them the same way.
 
     // ---------------- Stairs and lift icons ----------------
     //
@@ -372,12 +352,7 @@
         source: FLOOR_SRC,
         paint: {
           "line-color": byType("line"),
-          "line-width": [
-            "match", ["get", "type"],
-            "hallway", 1,
-            "service", 1,
-            1.4,
-          ],
+          "line-width": byType("width"),
         },
       });
 
