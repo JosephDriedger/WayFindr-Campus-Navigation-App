@@ -851,13 +851,79 @@ def load_seg(name, cfg, path):
     return seg
 
 
+def audit(name):
+    """What is wrong with a traced floor on its face, without opening it.
+
+    Reading a number off a card and drawing an outline are two different
+    mistakes, and this catches the second kind: outlines that cannot both be
+    right. Two rooms cannot stand on the same floor, so a pair that overlaps is
+    a pair with a wrong one in it -- which is how a supply room drawn over its
+    neighbour, and a room drawn on a slice of corridor, both came to light. Long
+    thin shapes are the corridor case: a room is roughly as deep as it is wide,
+    and one that is four times longer than it is broad is usually a piece of
+    hallway wearing a room number. A corridor may be exactly that shape, so it
+    is only remarked on for rooms.
+    """
+    from shapely.geometry import Polygon, Point
+    path = os.path.join(OUT_DIR, name + ".geojson")
+    with open(path, encoding="utf-8") as fh:
+        feats = json.load(fh)["features"]
+    img = load(name)
+    H, W = img.shape
+    pl = placement(name)
+    pxm = W / pl["widthM"] if pl else 17.0
+    shapes, notes = [], []
+    for f in feats:
+        p = f["properties"]
+        g = Polygon([(u*W, v*H) for u, v in p["uv"]])
+        if not g.is_valid or g.area <= 0:
+            notes.append("%s: the outline crosses itself" % p["room"])
+            continue
+        shapes.append((p, g))
+        box = g.minimum_rotated_rectangle.exterior.coords
+        sides = [math.dist(box[i], box[i+1]) for i in range(4)]
+        ratio = max(sides) / max(min(sides), 1e-6)
+        if ratio > 3.6 and p["type"] not in ("hallway",) and p.get("use") not in ("CORRIDOR", "SHAFT"):
+            notes.append("%s (%s): %.1f times longer than it is wide -- a piece of corridor?"
+                         % (p["room"], p.get("use") or p["type"], ratio))
+        if g.area / (pxm*pxm) < 2.0:
+            notes.append("%s: barely any area" % p["room"])
+    for i, (p1, g1) in enumerate(shapes):
+        for p2, g2 in shapes[i+1:]:
+            share = g1.intersection(g2).area
+            if share > 0.18 * min(g1.area, g2.area):
+                notes.append("%s and %s stand on the same floor (%.0f%% of the smaller)"
+                             % (p1["room"], p2["room"], 100*share/min(g1.area, g2.area)))
+    lab = os.path.join(WORK_DIR, name + ".txt")
+    if os.path.exists(lab):
+        placed = {p["room"]: g for p, g in shapes}
+        for line in open(lab, encoding="utf-8"):
+            line = line.split("#")[0].strip()
+            if not line or "," not in line.split()[0]:
+                continue
+            where, room = line.split()[0], line.split()[1]
+            x, y = (float(v) for v in where.split(","))
+            g = placed.get(room)
+            if g is not None and not g.contains(Point(x, y)):
+                notes.append("%s does not contain the label it was named from" % room)
+    print("%s: %d spaces" % (name, len(shapes)))
+    for n in notes:
+        print("   " + n)
+    if not notes:
+        print("   nothing obviously wrong")
+    return notes
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("what", choices=["cards", "write"])
+    ap.add_argument("what", choices=["cards", "write", "check"])
     ap.add_argument("floors", nargs="+", help="e.g. SW1-Floor3")
     args = ap.parse_args()
     os.makedirs(WORK_DIR, exist_ok=True)
     for name in args.floors:
+        if args.what == "check":
+            audit(name)
+            continue
         cfg = dict(SHEETS.get(name, DEFAULT))
         seg_path = os.path.join(WORK_DIR, name + "_seg.json")
         if args.what == "cards":
