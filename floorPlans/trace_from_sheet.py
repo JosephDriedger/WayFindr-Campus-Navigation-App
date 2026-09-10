@@ -851,6 +851,69 @@ def load_seg(name, cfg, path):
     return seg
 
 
+def circulation(name, cfg, rooms, min_m2=4.0):
+    """The hallways: whatever is inside the walls and is not a room.
+
+    A corridor cannot be found the way a room is. A room is a patch of floor
+    with a wall all the way round it, which is what a flood fill finds; a
+    corridor is the thing every one of those walls has a door onto, so the fill
+    either stops at the doors and misses it or runs through them and swallows
+    half the floor. Chasing it with a bigger seal only ever traded one for the
+    other.
+
+    But a floor is rooms and the space between them, and the rooms are already
+    known. So the corridor is arrived at by subtraction: take everything inside
+    the outer wall, take the rooms away, and what is left is where people walk.
+    It comes out in pieces where a lab or a stairwell interrupts it, which is
+    right -- a corridor that runs past a lab is not the same space as the lab,
+    and they should not be one shape.
+    """
+    ink = wall_ink(name, cfg.get("widths"), cfg.get("layers"), cfg.get("fills", False))
+    img = load(name)
+    H, W = ink.shape
+    pl = placement(name)
+    pxm = W / pl["widthM"] if pl else 17.0
+    solid = (ink < 200).astype(np.uint8)
+    k = cv2.getStructuringElement(cv2.MORPH_RECT, (7, 7))
+    free = (1 - cv2.morphologyEx(solid, cv2.MORPH_CLOSE, k)).astype(np.uint8)
+    # Where the building is, taken from where its rooms are. Asking instead for
+    # the free space that does not reach the edge of the paper does not work:
+    # the outer wall has doors in it, so the inside of the building runs out
+    # through them and joins the lawn.
+    if not rooms:
+        return []
+    hull = cv2.convexHull(np.vstack([np.array(r["poly"], np.int32) for r in rooms]))
+    built = np.zeros_like(free)
+    cv2.fillPoly(built, [hull], 1)
+    built = cv2.dilate(built, cv2.getStructuringElement(cv2.MORPH_RECT, (41, 41)))
+    inside = free & built
+    if not inside.any():
+        return []
+    for r in rooms:                      # take the rooms away
+        cv2.fillPoly(inside, [np.array(r["poly"], np.int32)], 0)
+    inside = cv2.morphologyEx(inside, cv2.MORPH_OPEN,
+                              cv2.getStructuringElement(cv2.MORPH_RECT, (9, 9)))
+    n2, lab2, st2, cen2 = cv2.connectedComponentsWithStats(inside, 4)
+    out = []
+    for i in range(1, n2):
+        x, y, w, h, a = st2[i]
+        if a < min_m2 * pxm * pxm:
+            continue
+        sub = np.zeros((h + 8, w + 8), np.uint8)
+        sub[4:4+h, 4:4+w] = (lab2[y:y+h, x:x+w] == i)
+        cs, _ = cv2.findContours(sub, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        poly = simplify(max(cs, key=cv2.contourArea), 8.0) + np.array([x-4, y-4], float)
+        poly = rectify([[float(q[0]), float(q[1])] for q in poly])
+        found = labels_in(img, poly)
+        out.append(dict(px=int(a), m2=round(a/(pxm*pxm), 1), poly=poly,
+                        cen=[float(cen2[i][0]), float(cen2[i][1])],
+                        labels=len(found),
+                        label=found[0]["box"] if len(found) == 1 else None,
+                        lcx=found[0]["cx"] if len(found) == 1 else float(cen2[i][0]),
+                        lcy=found[0]["cy"] if len(found) == 1 else float(cen2[i][1])))
+    return out
+
+
 def audit(name):
     """What is wrong with a traced floor on its face, without opening it.
 
