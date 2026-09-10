@@ -671,6 +671,11 @@ def read_sheet(name, inks=({},), rot=0, pxm=None, grow=4, open_k=21,
             if rot:
                 d["poly"] = [[H - 1 - q[1], q[0]] for q in d["poly"]]
             chosen.append(d)
+        stranded = by_leader(name, inks[0], [r["poly"] for r in chosen], pxm)
+        for d in stranded:
+            if rot:
+                d["poly"] = [[H - 1 - q[1], q[0]] for q in d["poly"]]
+            chosen.append(d)
     out = sorted(chosen, key=lambda r: (r["label"][1], r["label"][0]))
     # Snapping to the floor's wall lines is an improvement to a shape, not a
     # licence to wreck it: on an outline with a notch in it, pulling two nearby
@@ -1037,7 +1042,98 @@ def _clip_to_free(poly, taken, cx, cy, keep=0.25):
     return squared if Polygon(squared).is_valid else ring
 
 
-def by_walls(name, cfg, taken, pxm, reach_m=26.0, fan=5):
+def split_between(poly, labels):
+    """Cut a shape holding several numbers into one piece per number.
+
+    A pair of shafts side by side, or a run of them along a corridor, often has
+    no wall between them that the drawing makes any thicker than the hatching
+    inside -- so the rectangle comes back holding two numbers, and neither of
+    them can have it. Splitting it halfway between the labels is what anybody
+    tracing it would do: the wall is not visible, but it is obviously midway,
+    and two rooms of about equal size is a far better answer than one room with
+    two names or no rooms at all.
+    """
+    xs = [l["cx"] for l in labels]
+    ys = [l["cy"] for l in labels]
+    axis = 0 if (max(xs) - min(xs)) >= (max(ys) - min(ys)) else 1
+    order = sorted(range(len(labels)), key=lambda i: (xs[i] if axis == 0 else ys[i]))
+    lo = min(p[axis] for p in poly)
+    hi = max(p[axis] for p in poly)
+    olo = min(p[1-axis] for p in poly)
+    ohi = max(p[1-axis] for p in poly)
+    cuts = [lo]
+    for a, b in zip(order, order[1:]):
+        pa = xs[a] if axis == 0 else ys[a]
+        pb = xs[b] if axis == 0 else ys[b]
+        cuts.append((pa + pb) / 2)
+    cuts.append(hi)
+    out = []
+    for k, i in enumerate(order):
+        a, b = cuts[k], cuts[k+1]
+        if b - a < 8:
+            continue
+        box = ([[a, olo], [b, olo], [b, ohi], [a, ohi]] if axis == 0
+               else [[olo, a], [ohi, a], [ohi, b], [olo, b]])
+        out.append((labels[i], box))
+    return out
+
+
+def by_leader(name, cfg, claimed, pxm, reach_m=9.0):
+    """Rooms whose number would not fit inside them, so the sheet put it outside.
+
+    A cupboard two metres across cannot hold "4004 SUPP-INST" at stencil size,
+    so the drawing sets the label in whatever open space is nearest and runs a
+    leader line to the room. Every rule here assumes the opposite -- that a
+    label inside an outline is that outline's name -- and on these the
+    assumption points at the wrong room entirely: 4004 got drawn as a rectangle
+    in the middle of 4002, because that is where its label sits.
+
+    The tell is that the label has landed inside a room that already has a
+    number of its own. A number cannot name a room that is already named, so it
+    belongs to something else nearby -- and what is nearby, and has no name of
+    its own, is the little enclosure the leader points at. Pairing each such
+    label with the closest unnamed patch is not quite reading the leader line,
+    but it lands on the same room.
+    """
+    img = load(name)
+    ink = wall_ink(name, cfg.get("widths"), cfg.get("layers"), cfg.get("fills", False))
+    H, W = img.shape
+    sealed = bridge_doors(ink, pxm)
+    spare, orphans = [], []
+    for close in (3, 7, 11):
+        for r in patches(sealed, close, 4, int(1.0*pxm*pxm), int(60*pxm*pxm), 0):
+            if labels_in(img, r["poly"]):
+                continue
+            c = r["cen"]
+            if any(cv2.pointPolygonTest(np.array(t, np.float32), (float(c[0]), float(c[1])),
+                                        False) >= 0 for t in claimed):
+                continue
+            if any(math.hypot(o["cen"][0]-c[0], o["cen"][1]-c[1]) < 12 for o in orphans):
+                continue
+            orphans.append(r)
+    reach = reach_m * pxm
+    out = []
+    for lab in sheet_labels(img, pxm):
+        cx, cy = lab["cx"], lab["cy"]
+        inside = [t for t in claimed
+                  if cv2.pointPolygonTest(np.array(t, np.float32), (float(cx), float(cy)),
+                                          False) >= 0]
+        if not inside:
+            continue                    # not a stranded label; handled elsewhere
+        near = [(math.hypot(o["cen"][0]-cx, o["cen"][1]-cy), o) for o in orphans]
+        near = [(d, o) for d, o in near if d <= reach]
+        if not near:
+            continue
+        d, o = min(near, key=lambda t: t[0])
+        orphans.remove(o)
+        o = dict(o)
+        o.update(label=lab["box"], lcx=cx, lcy=cy, seal=0, ink="leader",
+                 m2=round(o["px"]/(pxm*pxm), 1))
+        out.append(o)
+    return out
+
+
+def by_walls(name, cfg, taken, pxm, reach_m=26.0, fan=5, rounds=4):
     """Draw the rooms the fill could not close, the way a person would.
 
     Some rooms cannot be flood-filled at all: a lab whose front is four metres
@@ -1065,37 +1161,65 @@ def by_walls(name, cfg, taken, pxm, reach_m=26.0, fan=5):
     mask = mask.astype(bool)
     limit = int(reach_m * pxm)
     out = []
-    for lab in sheet_labels(img, pxm):
-        cx, cy = lab["cx"], lab["cy"]
-        if any(cv2.pointPolygonTest(np.array(t, np.float32), (float(cx), float(cy)), False) >= 0
-               for t in taken):
-            continue
-        x, y, w, h = lab["box"]
-        spread = max(w, h) * 0.42
-        reach = {}
-        for name_d, (dx, dy) in (("l", (-1, 0)), ("r", (1, 0)), ("u", (0, -1)), ("d", (0, 1))):
-            runs = []
-            for k in range(fan):
-                off = (k - (fan-1)/2) / max((fan-1)/2, 1) * spread
-                ox, oy = (0, off) if dx else (off, 0)
-                runs.append(_wall_run(mask, cx+ox, cy+oy, dx, dy, limit))
-            runs.sort()
-            reach[name_d] = runs[len(runs)//2]
-        if min(reach.values()) < 6 or max(reach.values()) >= limit:
-            continue
-        poly = [[cx - reach["l"], cy - reach["u"]], [cx + reach["r"], cy - reach["u"]],
-                [cx + reach["r"], cy + reach["d"]], [cx - reach["l"], cy + reach["d"]]]
-        # Rays find a neighbour only when most of them run into it, so a small
-        # room off to one side gets driven straight over. Cutting the finished
-        # rectangle against what is already on the floor settles it either way:
-        # two rooms cannot stand on the same ground.
-        poly = _clip_to_free(poly, taken + [d["poly"] for d in out], cx, cy)
-        if poly is None:
-            continue
-        out.append(dict(poly=[[float(a), float(b)] for a, b in poly],
-                        label=lab["box"], lcx=cx, lcy=cy, seal=0, ink="walls",
-                        px=int(abs(reach["l"]+reach["r"]) * abs(reach["u"]+reach["d"])),
-                        cen=[float(cx), float(cy)]))
+    # Several passes. Each room drawn is a wall for the next one, so a rectangle
+    # that ran over its neighbour on the first pass stops at it on the second --
+    # and a room the first pass could not draw at all, because its rectangle was
+    # swallowed by a larger one, gets its own chance once that larger one has
+    # been cut back. It settles after three or four rounds.
+    for _ in range(rounds):
+      grew = False
+      claimed = list(taken) + [d["poly"] for d in out]
+      for lab in sheet_labels(img, pxm):
+          cx, cy = lab["cx"], lab["cy"]
+          if any(cv2.pointPolygonTest(np.array(t, np.float32), (float(cx), float(cy)), False) >= 0
+                 for t in claimed):
+              continue
+          x, y, w, h = lab["box"]
+          spread = max(w, h) * 0.42
+          reach = {}
+          for name_d, (dx, dy) in (("l", (-1, 0)), ("r", (1, 0)), ("u", (0, -1)), ("d", (0, 1))):
+              runs = []
+              for k in range(fan):
+                  off = (k - (fan-1)/2) / max((fan-1)/2, 1) * spread
+                  ox, oy = (0, off) if dx else (off, 0)
+                  runs.append(_wall_run(mask, cx+ox, cy+oy, dx, dy, limit))
+              runs.sort()
+              reach[name_d] = runs[len(runs)//2]
+          # A vestibule is narrower than the word "VESTIBULE". Where a label
+          # overflows its own room the sideways rays start already touching the
+          # wall, and a guard that wanted six pixels of clearance threw those
+          # rooms away -- the small ones, which are exactly the ones a label
+          # cannot fit inside. Only a ray that got nowhere at all is refused.
+          if min(reach.values()) < 3 or max(reach.values()) >= limit:
+              continue
+          if (reach["l"]+reach["r"]) * (reach["u"]+reach["d"]) < 1.5 * pxm * pxm:
+              continue          # smaller than a broom cupboard: not a room
+          poly = [[cx - reach["l"], cy - reach["u"]], [cx + reach["r"], cy - reach["u"]],
+                  [cx + reach["r"], cy + reach["d"]], [cx - reach["l"], cy + reach["d"]]]
+          # Rays find a neighbour only when most of them run into it, so a small
+          # room off to one side gets driven straight over. Cutting the finished
+          # rectangle against what is already on the floor settles it either way:
+          # two rooms cannot stand on the same ground.
+          poly = _clip_to_free(poly, claimed, cx, cy)
+          if poly is None:
+              continue
+          inside = [l for l in labels_in(img, poly)]
+          pieces = (split_between(poly, inside) if len(inside) > 1
+                    else [(lab, poly)])
+          for who, box in pieces:
+              if any(abs(d["lcx"]-who["cx"]) < 25 and abs(d["lcy"]-who["cy"]) < 25
+                     for d in out):
+                  continue
+              grew = True
+              claimed = claimed + [box]
+              wx, wy = who["cx"], who["cy"]
+              w = abs(max(q[0] for q in box) - min(q[0] for q in box))
+              h = abs(max(q[1] for q in box) - min(q[1] for q in box))
+              out.append(dict(poly=[[float(a), float(b)] for a, b in box],
+                              label=who["box"], lcx=wx, lcy=wy, seal=0, ink="walls",
+                              px=int(w*h), cen=[float(wx), float(wy)]))
+      if not grew:
+          break
     for r in out:
         r["m2"] = round(r["px"]/(pxm*pxm), 1)
     return out
