@@ -50,7 +50,9 @@ R_EARTH = 6378137.0
 # altogether. So every seal is tried, and a room is kept from the loosest one
 # that encloses exactly one label -- one room, one number, and the least
 # distortion that gets there.
-SEALS = (7, 11, 15, 19, 23, 29, 37, 45)
+# With the doorways already bridged, most rooms close at the lightest touch.
+# The wider seals stay for the sheets that are drawn too loosely to bridge.
+SEALS = (3, 5, 7, 11, 15, 21, 29, 37)
 
 # Which ink to read the walls from, per sheet, tried in order. A sheet is often
 # two drawings -- a wing surveyed in one decade and a wing in another, with
@@ -342,6 +344,35 @@ def square_corners(poly, ink=None, max_cut=22.0, bare=0.55):
     return out if len(out) >= 3 else poly
 
 
+def bridge_doors(ink, pxm, widest=1.9, slack=1.35):
+    """Close the doorways, and only the doorways.
+
+    Sealing a sheet by closing it everywhere is a blunt instrument: the kernel
+    wide enough to shut a metre of doorway also rounds every corner, swallows
+    every alcove, and welds a small room to the cupboard beside it. But a
+    doorway is not just any gap -- it is a gap about a door wide, with wall on
+    both sides of it.
+
+    So the closing is done, and then thrown away except where it added a patch
+    the size of a door. A real doorway gets a lintel drawn across it and the
+    room behind it becomes a room; a lab standing open to the corridor across
+    four metres gets nothing, and stays part of the corridor, which is the
+    truth about it.
+    """
+    solid = (ink < 200).astype(np.uint8)
+    span = max(int(widest * pxm), 9)
+    closed = cv2.morphologyEx(solid, cv2.MORPH_CLOSE,
+                              cv2.getStructuringElement(cv2.MORPH_RECT, (span, span)))
+    added = (closed & (1 - solid)).astype(np.uint8)
+    n, lab, stats, _ = cv2.connectedComponentsWithStats(added, 8)
+    keep = np.zeros_like(solid)
+    for i in range(1, n):
+        x, y, w, h, a = stats[i]
+        if a <= slack * span * span and min(w, h) <= span:
+            keep[lab == i] = 1
+    return np.where(solid | keep, 0, 255).astype(np.uint8)
+
+
 def simplify(contour, eps_px=6.0, snap_px=7.0):
     """Cut the wiggle out of a traced outline and square up its near-axis edges."""
     poly = cv2.approxPolyDP(contour, eps_px, True).reshape(-1, 2).astype(float)
@@ -596,8 +627,9 @@ def read_sheet(name, inks=({},), rot=0, pxm=None, grow=4, open_k=21,
     back = (lambda p: [p[1], H - 1 - p[0]]) if rot else (lambda p: list(p))
     chosen = []
     for cfg in inks:
-        ink = turn(wall_ink(name, cfg.get("widths"), cfg.get("layers"),
-                            cfg.get("fills", False)))
+        raw = wall_ink(name, cfg.get("widths"), cfg.get("layers"),
+                       cfg.get("fills", False))
+        ink = turn(bridge_doors(raw, pxm))
         img = turn(flat)
         for close in SEALS:
             for r in patches(ink, close, grow, int(min_m2 * pxm * pxm),
@@ -704,7 +736,25 @@ def _label_pane(src, label, poly, size, rot, z):
     return tile
 
 
-def cards(seg, out_dir):
+def already_read(name, seg, tol=25.0):
+    """Which of these rooms already have a number, by where their label sits."""
+    path = os.path.join(WORK_DIR, name + ".txt")
+    if not os.path.exists(path):
+        return set()
+    done = set()
+    for line in open(path, encoding="utf-8"):
+        line = line.split("#")[0].strip()
+        if not line or "," not in line.split()[0]:
+            continue
+        x, y = (float(v) for v in line.split()[0].split(","))
+        for r in seg["rooms"]:
+            if math.hypot(r["lcx"] - x, r["lcy"] - y) <= tol:
+                done.add(r["id"])
+                break
+    return done
+
+
+def cards(seg, out_dir, skip=()):
     """A card per room, in two halves.
 
     The shape of a room and the number written in it will not sit in one
@@ -721,6 +771,8 @@ def cards(seg, out_dir):
         src, z = cv2.cvtColor(load(name), cv2.COLOR_GRAY2BGR), 1
     tiles = []
     for r in seg["rooms"]:
+        if r["id"] in skip:
+            continue          # already has a number, and it was checked once
         box = cv2.boundingRect(np.array(r["poly"], np.int32) * z)
         tile = np.full((PH, PW*2, 3), 255, np.uint8)
         tile[:, :PW] = _fit(src, np.array(r["poly"]) * z, box, (PW, PH), rot)
@@ -981,6 +1033,8 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("what", choices=["cards", "write", "check"])
     ap.add_argument("floors", nargs="+", help="e.g. SW1-Floor3")
+    ap.add_argument("--all", action="store_true",
+                    help="cards for every room, not just the ones with no number yet")
     args = ap.parse_args()
     os.makedirs(WORK_DIR, exist_ok=True)
     for name in args.floors:
@@ -993,9 +1047,10 @@ def main():
             seg = read_sheet(name, **cfg)
             with open(seg_path, "w", encoding="utf-8") as fh:
                 json.dump(seg, fh)
-            paths = cards(seg, WORK_DIR)
-            print("%s: %d rooms found, %d cards to read"
-                  % (name, len(seg["rooms"]), len(paths)))
+            done = set() if args.all else already_read(name, seg)
+            paths = cards(seg, WORK_DIR, skip=done)
+            print("%s: %d rooms found, %d already read, %d cards to read"
+                  % (name, len(seg["rooms"]), len(done), len(paths)))
             for p in paths:
                 print("   " + os.path.relpath(p, REPO))
             print("   then write %s, a line per room, and: write %s"
