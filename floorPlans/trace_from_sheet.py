@@ -58,15 +58,23 @@ SEALS = (7, 11, 15, 19, 23, 29, 37, 45)
 # and the honest thing is to try each and let the labels say which worked where.
 # `widths` are PDF stroke weights; `layers` are CAD layer names, on the sheets
 # whose export kept them; an empty dict means the rendered sheet, ink and all.
-WALLS = ["WALL", "JAMB", "DOOR", "DSWING", "GLAZE", "SILL", "STAIR",
-         "A-DR-FR", "A-DOOR"]
+# The walls and what stands in for a wall: a door leaf and a jamb close an
+# opening, glazing and a sill close a window. Not DSWING, which is the quarter
+# circle a door sweeps -- an arc drawn across the floor of the room, and putting
+# it in the walls bites that arc out of the room. Not STAIR either: treads are
+# drawn inside the shaft, and treating them as walls slices a stairwell into a
+# dozen slivers, none of which is the stairwell.
+WALLS = ["WALL", "JAMB", "DOOR", "GLAZE", "SILL", "A-DR-FR", "A-DOOR"]
 SHEETS = {
     "SW1-Floor1": dict(inks=[{"widths": [0.54, 0.72]},
                              {"widths": [0.12, 0.36, 0.42, 0.54, 0.72]}, {}]),
     "SW1-Floor2": dict(inks=[{"widths": [0.12, 0.36, 0.42, 0.54, 0.72]},
                              {"widths": [0.12]}, {}]),
-    "SW1-Floor3": dict(inks=[{"layers": WALLS}, {}]),
-    "SW1-Floor4": dict(inks=[{"layers": WALLS}, {}]),
+    # Walls first, so the shapes that come out clean come out clean; then the
+    # same walls with the stair treads added, because a few stairwells are only
+    # closed by them, and a notchy stairwell beats no stairwell.
+    "SW1-Floor3": dict(inks=[{"layers": WALLS}, {"layers": WALLS + ["STAIR"]}, {}]),
+    "SW1-Floor4": dict(inks=[{"layers": WALLS}, {"layers": WALLS + ["STAIR"]}, {}]),
     "SE12-Floor1": dict(inks=[{"widths": [0.42, 0.54, 1.14]},
                               {"widths": [0.54, 1.14]}, {}], rot=90, pxm=28.4),
 }
@@ -253,9 +261,19 @@ def patches(ink, close, grow, min_px, max_px, open_k=21):
         pad = grow + 2
         sub = np.zeros((h + 2*pad, w + 2*pad), np.uint8)
         sub[pad:pad+h, pad:pad+w] = (lab[y:y+h, x:x+w] == i)
-        if ok is not None:
-            # take the door alcoves out: a metre-deep notch every few metres is
-            # what makes a traced corridor look like a comb
+        # Whatever is drawn inside a room -- a bench, a row of seats, the treads
+        # of a stair -- is ink the fill flows around, so the patch comes back
+        # with holes in it and a coastline that wanders in to reach them. The
+        # room is the space the walls enclose, so the holes are filled first and
+        # only the outer boundary is kept.
+        holes = sub.copy()
+        edge = np.zeros((holes.shape[0] + 2, holes.shape[1] + 2), np.uint8)
+        cv2.floodFill(holes, edge, (0, 0), 1)
+        sub = sub | (1 - holes)
+        if ok is not None and a > 40 * (min_px or 1):
+            # take the door alcoves out of a corridor: a metre-deep notch every
+            # few metres is what makes a traced hallway look like a comb. Only a
+            # corridor, though -- run over a small room it rounds off its corners
             opened = cv2.morphologyEx(sub, cv2.MORPH_OPEN, ok)
             if opened.sum() > 0.55 * sub.sum():
                 sub = opened
@@ -326,7 +344,16 @@ def snap_grid(regs, tol=6.0):
 # Labels
 # ---------------------------------------------------------------------------
 def text_blocks(img, poly, pad=4):
-    """Glyph-sized ink inside the outline, gathered into lines of text."""
+    """Glyph-sized ink inside the outline, gathered into lines of text.
+
+    Lines are looked for both ways round. A sheet sets most of its labels
+    across the page but turns the ones in a narrow room on their side, and a
+    reader that only knows rows cannot see those at all -- which is worse than
+    missing them, because a patch of floor with a sideways label in it then
+    looks like a patch with no label, or, if it also swallowed a room whose
+    label reads across, like a room with exactly one. That is how an open-plan
+    office ends up drawn over its neighbour and wearing its number.
+    """
     m = np.zeros(img.shape, np.uint8)
     cv2.fillPoly(m, [np.array(poly, np.int32)], 1)
     m = cv2.erode(m, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5)))
@@ -334,22 +361,28 @@ def text_blocks(img, poly, pad=4):
     x, y = max(x, 0), max(y, 0)
     ink = ((img[y:y+h, x:x+w] < 200) & (m[y:y+h, x:x+w] > 0)).astype(np.uint8)
     n, lab, st, ce = cv2.connectedComponentsWithStats(ink, 8)
-    glyphs = [i for i in range(1, n)
-              if 7 <= st[i][3] <= 34 and 1 <= st[i][2] <= 46 and st[i][4] >= 6]
-    rows = {}
-    for i in glyphs:
-        rows.setdefault(round(ce[i][1] / 16), []).append(i)
     runs = []
-    for ids in rows.values():
-        ids.sort(key=lambda i: ce[i][0])
-        run = [ids[0]]
-        for i in ids[1:]:
-            if ce[i][0] - ce[run[-1]][0] < 60:
-                run.append(i)
-            else:
-                runs.append(run)
-                run = [i]
-        runs.append(run)
+    for down in (0, 1):
+        # a glyph is tall-ish and narrow-ish read one way, and the same shape
+        # with its sides swapped read the other
+        lo, hi = (7, 34) if not down else (1, 46)
+        lo2, hi2 = (1, 46) if not down else (7, 34)
+        glyphs = [i for i in range(1, n)
+                  if lo <= st[i][3] <= hi and lo2 <= st[i][2] <= hi2 and st[i][4] >= 6]
+        along, across = (0, 1) if not down else (1, 0)
+        lines = {}
+        for i in glyphs:
+            lines.setdefault(round(ce[i][across] / 16), []).append(i)
+        for ids in lines.values():
+            ids.sort(key=lambda i: ce[i][along])
+            run = [ids[0]]
+            for i in ids[1:]:
+                if ce[i][along] - ce[run[-1]][along] < 60:
+                    run.append(i)
+                else:
+                    runs.append(run)
+                    run = [i]
+            runs.append(run)
     out = []
     for run in runs:
         if len(run) < 2:
@@ -396,6 +429,29 @@ def labels_in(img, poly):
 # ---------------------------------------------------------------------------
 # A floor
 # ---------------------------------------------------------------------------
+def depth_in(poly, cx, cy):
+    """How deep inside the outline a point sits, as a fraction of the deepest.
+
+    1.0 is the middle of the widest part of the room; 0 is on the wall. It does
+    not care how long the room is, only how far from an edge -- which is the
+    difference between a stairwell's number at the end of its shaft (deep) and a
+    number the fill picked up on its way past (shallow).
+    """
+    ring = np.array(poly, np.int32)
+    x, y, w, h = cv2.boundingRect(ring)
+    m = np.zeros((h + 2, w + 2), np.uint8)
+    cv2.fillPoly(m, [ring - [x - 1, y - 1]], 1)
+    d = cv2.distanceTransform(m, cv2.DIST_L2, 3)
+    peak = float(d.max())
+    if peak <= 0:
+        return 0.0
+    px, py = int(round(cx - x + 1)), int(round(cy - y + 1))
+    if not (0 <= px < d.shape[1] and 0 <= py < d.shape[0]):
+        return 0.0
+    return float(d[py, px]) / peak
+
+
+
 def read_sheet(name, inks=({},), rot=0, pxm=None, grow=4, open_k=21,
                min_m2=1.5, max_m2=1200, snap=6.0):
     """One outline per label on the sheet."""
@@ -420,6 +476,17 @@ def read_sheet(name, inks=({},), rot=0, pxm=None, grow=4, open_k=21,
                 if len(found) != 1:
                     continue
                 cx, cy = found[0]["cx"], found[0]["cy"]
+                # A room is labelled well inside itself. A label crowded against
+                # the edge of an outline means the outline is not that room's:
+                # the fill has run somewhere and taken a number with it.
+                #
+                # How far inside, not how near the middle. A stairwell is a long
+                # thin shaft with its number at one end -- miles from the centre
+                # of its own bounding box, and still unmistakably its own label.
+                # What the bad ones have in common is not being off-centre but
+                # being up against a wall, so that is what is measured.
+                if depth_in(r["poly"], cx, cy) < 0.33:
+                    continue
                 # one room, one outline: the same label found again at a tighter
                 # seal is the same room, not another one
                 if any(abs(c["lcx"] - cx) < 40 and abs(c["lcy"] - cy) < 22 for c in chosen):
@@ -442,32 +509,94 @@ def read_sheet(name, inks=({},), rot=0, pxm=None, grow=4, open_k=21,
     return dict(name=name, W=W, H=H, pxm=pxm, rot=rot, rooms=out)
 
 
-CW, CH, COLS, ROWS = 350, 130, 5, 8
-SW, SH = 250, 93              # what is cut out, before it is blown up to fit
+SW, SH = 125, 93              # what is cut out around the label, in tracing pixels
+CARD_ZOOM = 2                 # and how much sharper than that it is drawn
+PW, PH = SW*CARD_ZOOM, SH*CARD_ZOOM
+CW, CH, COLS, ROWS = PW*2, PH, 4, 6
+
+
+def sharper(name, factor=CARD_ZOOM):
+    """The sheet re-rendered from the PDF at `factor` times the tracing scale.
+
+    The rooms have to be found in the frame the placement is calibrated in, and
+    that frame is fixed. Reading the labels does not: they are on the same
+    sheet, and the sheet is vector. Enlarging the PNG only enlarges the same
+    216 dpi of stencil font -- going back to the PDF gets glyphs that were
+    never blurred in the first place, which is the difference between guessing
+    at a number and reading it.
+    """
+    doc = pymupdf.open(os.path.join(PDF_DIR, name + ".pdf"))
+    page = doc[0]
+    crop = ink_crop(page)
+    pix = page.get_pixmap(matrix=pymupdf.Matrix(ZOOM * factor, ZOOM * factor))
+    arr = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.height, pix.width, pix.n)
+    big = arr[crop[1]*factor:(crop[3]+1)*factor, crop[0]*factor:(crop[2]+1)*factor, :3]
+    return np.ascontiguousarray(big[:, :, ::-1])          # RGB out of fitz, BGR in
+
+
+def _fit(src, poly, box, size, rot):
+    """The outline and its surroundings, shrunk to fit -- what shape is this room."""
+    x, y, w, h = box
+    m = int(max(w, h) * 0.18) + 12
+    x0, y0 = max(x - m, 0), max(y - m, 0)
+    x1, y1 = min(x + w + m, src.shape[1]), min(y + h + m, src.shape[0])
+    cut = src[y0:y1, x0:x1].copy()
+    if cut.size == 0:
+        return np.full((size[1], size[0], 3), 245, np.uint8)
+    cv2.polylines(cut, [np.array(poly, np.int32) - [x0, y0]], True, (0, 0, 230),
+                  max(int(max(w, h) / 90), 2))
+    if rot:
+        cut = cv2.rotate(cut, cv2.ROTATE_90_COUNTERCLOCKWISE)
+    scale = min(size[0] / cut.shape[1], size[1] / cut.shape[0])
+    small = cv2.resize(cut, (max(int(cut.shape[1]*scale), 1), max(int(cut.shape[0]*scale), 1)),
+                       interpolation=cv2.INTER_AREA)
+    pane = np.full((size[1], size[0], 3), 255, np.uint8)
+    oy, ox = (size[1]-small.shape[0])//2, (size[0]-small.shape[1])//2
+    pane[oy:oy+small.shape[0], ox:ox+small.shape[1]] = small
+    return pane
+
+
+def _label_pane(src, label, poly, size, rot, z):
+    """The room's own label, big -- what number is this room."""
+    lx, ly, lw, lh = [v * z for v in label]
+    cw, ch = (size[1], size[0]) if rot else (size[0], size[1])
+    x0 = int(np.clip(lx + lw//2 - cw//2, 0, src.shape[1] - cw))
+    y0 = int(np.clip(ly + lh//2 - ch//2, 0, src.shape[0] - ch))
+    tile = src[y0:y0+ch, x0:x0+cw].copy()
+    lit = tile.copy()
+    cv2.rectangle(lit, (lx-x0-4*z, ly-y0-4*z), (lx+lw-x0+4*z, ly+lh-y0+4*z), (120, 235, 255), -1)
+    tile = cv2.addWeighted(tile, 0.5, lit, 0.5, 0)
+    cv2.polylines(tile, [np.array(poly, np.int32) * z - [x0, y0]], True, (0, 0, 230), 2*z)
+    if rot:
+        tile = cv2.rotate(tile, cv2.ROTATE_90_COUNTERCLOCKWISE)
+    if tile.shape[:2] != (size[1], size[0]):
+        tile = cv2.resize(tile, size, interpolation=cv2.INTER_AREA)
+    return tile
 
 
 def cards(seg, out_dir):
-    """A card per room: its label highlighted, its outline drawn, big enough to read."""
+    """A card per room, in two halves.
+
+    The shape of a room and the number written in it will not sit in one
+    picture: fit the whole outline and the label is four pixels tall, blow up
+    the label and the outline runs off every edge. Both questions have to be
+    answerable -- is this outline a room, and is this its number -- so the card
+    answers them side by side, the room fitted on the left and its label
+    magnified on the right.
+    """
     name, rot = seg["name"], seg.get("rot", 0)
-    colour = cv2.cvtColor(load(name), cv2.COLOR_GRAY2BGR)
-    H, W = colour.shape[:2]
+    try:
+        src, z = sharper(name), CARD_ZOOM
+    except Exception:
+        src, z = cv2.cvtColor(load(name), cv2.COLOR_GRAY2BGR), 1
     tiles = []
     for r in seg["rooms"]:
-        lx, ly, lw, lh = r["label"]
-        x, y, w, h = (lx - (lh-lw)//2, ly - (lw-lh)//2, lh, lw) if rot else (lx, ly, lw, lh)
-        cw, ch = (SH, SW) if rot else (SW, SH)
-        x0 = int(np.clip(x + w//2 - cw//2, 0, W - cw))
-        y0 = int(np.clip(y + h//2 - ch//2, 0, H - ch))
-        tile = colour[y0:y0+ch, x0:x0+cw].copy()
-        lit = tile.copy()
-        cv2.rectangle(lit, (lx - x0 - 4, ly - y0 - 4),
-                      (lx + lw - x0 + 4, ly + lh - y0 + 4), (120, 235, 255), -1)
-        tile = cv2.addWeighted(tile, 0.55, lit, 0.45, 0)
-        cv2.polylines(tile, [np.array(r["poly"], np.int32) - [x0, y0]], True, (0, 0, 230), 2)
-        if rot:
-            tile = cv2.rotate(tile, cv2.ROTATE_90_COUNTERCLOCKWISE)
-        tiles.append((r["id"], r["m2"],
-                      cv2.resize(tile, (CW, CH), interpolation=cv2.INTER_CUBIC)))
+        box = cv2.boundingRect(np.array(r["poly"], np.int32) * z)
+        tile = np.full((PH, PW*2, 3), 255, np.uint8)
+        tile[:, :PW] = _fit(src, np.array(r["poly"]) * z, box, (PW, PH), rot)
+        tile[:, PW:] = _label_pane(src, r["label"], r["poly"], (PW, PH), rot, z)
+        cv2.line(tile, (PW, 0), (PW, PH), (170, 170, 170), 1)
+        tiles.append((r["id"], r["m2"], tile))
     paths, per = [], COLS * ROWS
     for s in range(0, len(tiles), per):
         canvas = np.full((ROWS * (CH+26), COLS * (CW+6), 3), 255, np.uint8)
@@ -476,7 +605,7 @@ def cards(seg, out_dir):
             y0, x0 = rr * (CH+26), cc * (CW+6)
             canvas[y0+26:y0+26+CH, x0:x0+CW] = tile
             cv2.putText(canvas, "#%d" % rid, (x0+4, y0+19),
-                        cv2.FONT_HERSHEY_SIMPLEX, .62, (0, 0, 0), 2)
+                        cv2.FONT_HERSHEY_SIMPLEX, .7, (0, 0, 0), 2)
             cv2.putText(canvas, "%.0fm2" % m2, (x0+CW-88, y0+19),
                         cv2.FONT_HERSHEY_SIMPLEX, .5, (90, 90, 90), 1)
             cv2.rectangle(canvas, (x0, y0+24), (x0+CW, y0+26+CH), (150, 150, 150), 1)
