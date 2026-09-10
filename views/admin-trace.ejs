@@ -76,6 +76,8 @@
         </label>
         <div class="tracer-row">
           <button type="button" id="startDraw" class="tracer-primary">Draw</button>
+          <button type="button" id="undoEdit" disabled title="Ctrl+Z">Undo</button>
+          <button type="button" id="redoEdit" disabled title="Ctrl+Shift+Z">Redo</button>
         </div>
         <div class="tracer-row" id="draftControls" hidden>
           <button type="button" id="finishDraw" class="tracer-primary">Finish Room</button>
@@ -85,6 +87,11 @@
         <p class="tracer-hint" id="drawHint">
           Click each corner, then Finish. Double-click also closes it;
           Backspace undoes a corner and Esc cancels.
+        </p>
+        <p class="tracer-hint">
+          Select a room to reshape it: drag a corner to move it, drag the
+          middle to move the whole room, drag a small hollow handle to add a
+          corner, alt-click a corner to remove one. Ctrl+Z takes back anything.
         </p>
 
         <details class="tracer-details" id="planImageBlock">

@@ -147,6 +147,7 @@ const CAMPUS_SRC = "campus-buildings";
 const PARKING_SRC = "campus-parking";
 const OVERVIEW_SRC = "traced-overview";
 const DRAFT_SRC = "draft-room";
+const GRIPS_SRC = "shape-grips";
 
 /**
  * A colour per kind of node, by where it stands relative to the open sheet.
@@ -423,6 +424,29 @@ function ensureLayers() {
         "text-color": ["case", IS_COMPANION, "#0f172a", "#334155"],
         "text-halo-color": "#fff",
         "text-halo-width": 1.5,
+      },
+    });
+  }
+  if (!map.getSource(GRIPS_SRC)) {
+    map.addSource(GRIPS_SRC, { type: "geojson", data: emptyFC() });
+    // Corners of whatever outline is selected. Drawn last so they sit over the
+    // room they belong to, and big enough to be caught without zooming in --
+    // a corner you have to hunt for is a corner you will move by accident.
+    map.addLayer({
+      id: "grip-mid", type: "circle", source: GRIPS_SRC,
+      filter: ["==", ["get", "grip"], "mid"],
+      paint: {
+        "circle-radius": 4, "circle-color": "#fff",
+        "circle-stroke-color": "#1a73e8", "circle-stroke-width": 2,
+        "circle-opacity": 0.9,
+      },
+    });
+    map.addLayer({
+      id: "grip-corner", type: "circle", source: GRIPS_SRC,
+      filter: ["==", ["get", "grip"], "corner"],
+      paint: {
+        "circle-radius": 6, "circle-color": "#1a73e8",
+        "circle-stroke-color": "#fff", "circle-stroke-width": 2,
       },
     });
   }
@@ -1104,6 +1128,7 @@ function redrawRooms() {
     type: "FeatureCollection",
     features: built.filter((f) => f.geometry.type === "Polygon"),
   });
+  redrawGrips();
   t0 = performance.now();
   map.getSource(MARKS_SRC)?.setData({
     type: "FeatureCollection",
@@ -1388,6 +1413,139 @@ function zoomToPlan() {
 }
 
 // ---------------------------------------------------------------------------
+// Reshaping what has been drawn
+//
+// An outline is right the first time about as often as a sentence is. Until
+// now the only way to change one was to delete it and draw it again, which
+// threw away its number and its type along with the shape that was nearly
+// right -- so a corner three feet out cost the whole room. Selecting an
+// outline now puts a handle on every corner: drag one to move it, drag the
+// middle of the room to move all of them together, drag a midpoint to add a
+// corner, and alt-click a corner to take it away.
+// ---------------------------------------------------------------------------
+const GRIP_PX = 10;             // how near the pointer must be to catch a corner
+
+/** The corners of the selected outline, and the midpoints between them. */
+function gripFeatures() {
+  const r = rooms[selected];
+  if (!r || r.kind !== "polygon" || !Array.isArray(r.uv) || onHiddenFloor(r)) return [];
+  const out = [];
+  r.uv.forEach((uv, i) => {
+    out.push({
+      type: "Feature", properties: { grip: "corner", i },
+      geometry: { type: "Point", coordinates: uvToLngLat(uv) },
+    });
+    const nxt = r.uv[(i + 1) % r.uv.length];
+    out.push({
+      type: "Feature", properties: { grip: "mid", i },
+      geometry: {
+        type: "Point",
+        coordinates: uvToLngLat([(uv[0] + nxt[0]) / 2, (uv[1] + nxt[1]) / 2]),
+      },
+    });
+  });
+  return out;
+}
+
+function redrawGrips() {
+  map.getSource(GRIPS_SRC)?.setData({
+    type: "FeatureCollection",
+    features: adjusting || draft ? [] : gripFeatures(),
+  });
+}
+
+/** Which handle of the selected outline is under the pointer, if any. */
+function gripNear(lngLat) {
+  const r = rooms[selected];
+  if (!r || r.kind !== "polygon" || !Array.isArray(r.uv) || draft || adjusting) return null;
+  const here = map.project(lngLat);
+  let best = null, bestD = GRIP_PX;
+  r.uv.forEach((uv, i) => {
+    const p = map.project(uvToLngLat(uv));
+    const d = Math.hypot(p.x - here.x, p.y - here.y);
+    if (d < bestD) { bestD = d; best = { kind: "corner", i }; }
+  });
+  if (best) return best;
+  // midpoints only when no corner is closer, so adding a corner never happens
+  // by accident when you meant to move one
+  r.uv.forEach((uv, i) => {
+    const nxt = r.uv[(i + 1) % r.uv.length];
+    const p = map.project(uvToLngLat([(uv[0] + nxt[0]) / 2, (uv[1] + nxt[1]) / 2]));
+    const d = Math.hypot(p.x - here.x, p.y - here.y);
+    if (d < bestD) { bestD = d; best = { kind: "mid", i }; }
+  });
+  return best;
+}
+
+/** Is this point inside the selected outline? Even-odd, in plan space. */
+function insideSelected(lngLat) {
+  const r = rooms[selected];
+  if (!r || r.kind !== "polygon" || !Array.isArray(r.uv) || draft || adjusting) return false;
+  const uv = lngLatToUv([lngLat.lng, lngLat.lat]);
+  if (!uv) return false;
+  let inside = false;
+  const ring = r.uv;
+  for (let i = 0; i < ring.length; i++) {
+    const [ax, ay] = ring[i === 0 ? ring.length - 1 : i - 1];
+    const [bx, by] = ring[i];
+    if ((by > uv[1]) !== (ay > uv[1])
+        && uv[0] < ((ax - bx) * (uv[1] - by)) / (ay - by) + bx) inside = !inside;
+  }
+  return inside;
+}
+
+// ---------------------------------------------------------------------------
+// Taking it back
+//
+// Every change here is one keystroke from being undone, because the cost of a
+// wrong one is otherwise redrawing a room by hand, and knowing that makes
+// people tentative with a tool they should be quick with. The whole list is
+// copied rather than the change recorded: a floor is a few hundred small
+// objects, copying it is not measurable next to the redraw it triggers, and a
+// snapshot cannot be wrong about what it undoes the way a replayed edit can.
+// ---------------------------------------------------------------------------
+const HISTORY_MAX = 60;
+let past = [];
+let future = [];
+
+/** Take a copy before changing anything, so the change can be taken back. */
+function remember() {
+  past.push(JSON.stringify(rooms));
+  if (past.length > HISTORY_MAX) past.shift();
+  future.length = 0;
+  updateUndoButtons();
+}
+
+function restore(json) {
+  rooms = JSON.parse(json);
+  selected = -1;
+  closeDialog();
+  redrawRooms();
+  markDirty();
+  updateUndoButtons();
+}
+
+function undo() {
+  if (!past.length) { updateUndoButtons(); setDrawHint("Nothing left to undo."); return; }
+  future.push(JSON.stringify(rooms));
+  restore(past.pop());
+  setDrawHint("Undone.");
+}
+
+function redo() {
+  if (!future.length) { updateUndoButtons(); setDrawHint("Nothing to redo."); return; }
+  past.push(JSON.stringify(rooms));
+  restore(future.pop());
+  setDrawHint("Redone.");
+}
+
+function updateUndoButtons() {
+  const u = el("undoEdit"), r = el("redoEdit");
+  if (u) u.disabled = !past.length;
+  if (r) r.disabled = !future.length;
+}
+
+// ---------------------------------------------------------------------------
 // Drawing
 // ---------------------------------------------------------------------------
 function snappedUv(lngLat) {
@@ -1644,7 +1802,8 @@ function onMapClick(e) {
   }
 
   if (isPointType(type)) {
-    rooms.push({ kind: "point", uv: snappedUv(e.lngLat), room: null, type });
+    remember();
+  rooms.push({ kind: "point", uv: snappedUv(e.lngLat), room: null, type });
     forgetNodeIndex();
     draft = null;
     redrawDraft();
@@ -1691,6 +1850,7 @@ function setDrafting(on) {
 
 function finishDraft() {
   if (!draft || draft.length < 3) return;
+  remember();
   rooms.push({ kind: "polygon", uv: draft, room: null, type: activeType() });
   forgetNodeIndex();
   draft = null;
@@ -2586,6 +2746,7 @@ function zoomToItem(i) {
 function removeItem(i) {
   const r = rooms[i];
   if (!r) return;
+  remember();
   const doomed = new Set([i]);
   if (r.kind === "point" && r.nid) {
     rooms.forEach((other, j) => {
@@ -3229,11 +3390,52 @@ loadPlanList();
 let dragIndex = -1;
 let dragMoved = false;
 
+// What is being reshaped, when an outline rather than a marker is under the
+// pointer: which corner, or the whole ring, and where the drag started.
+let grip = null;
+
 map.on("mousedown", (e) => {
   // not while drawing, and not while the plan itself is being positioned
   if (draft || adjusting) return;
+
+  // An outline first, because its handles sit on top of it and a corner is a
+  // smaller target than the room it belongs to.
+  const g = gripNear(e.lngLat);
+  const r = rooms[selected];
+  if (g || insideSelected(e.lngLat)) {
+    if (g && g.kind === "corner" && (e.originalEvent?.altKey)) {
+      // alt-click takes a corner away, but never below a triangle
+      if (r.uv.length <= 3) { setDrawHint("A room needs at least three corners."); return; }
+      remember();
+      r.uv.splice(g.i, 1);
+      redrawRooms();
+      markDirty();
+      setDrawHint("Corner removed.");
+      e.preventDefault?.();
+      return;
+    }
+    remember();
+    if (g && g.kind === "mid") {
+      // dragging a midpoint puts a new corner there and moves that
+      const nxt = r.uv[(g.i + 1) % r.uv.length];
+      const mid = [(r.uv[g.i][0] + nxt[0]) / 2, (r.uv[g.i][1] + nxt[1]) / 2];
+      r.uv.splice(g.i + 1, 0, mid);
+      grip = { kind: "corner", i: g.i + 1 };
+    } else if (g) {
+      grip = { kind: "corner", i: g.i };
+    } else {
+      grip = { kind: "shape", from: lngLatToUv([e.lngLat.lng, e.lngLat.lat]) };
+    }
+    dragMoved = false;
+    map.dragPan.disable();
+    map.getCanvas().style.cursor = "grabbing";
+    e.preventDefault?.();
+    return;
+  }
+
   const i = pointIndexNear(e.lngLat);
   if (i < 0) return;
+  remember();
   dragIndex = i;
   dragMoved = false;
   // the map must not pan out from under the marker being dragged
@@ -3243,11 +3445,28 @@ map.on("mousedown", (e) => {
 });
 
 map.on("mousemove", (e) => {
+  if (grip) {
+    const r = rooms[selected];
+    if (!r) { grip = null; return; }
+    dragMoved = true;
+    const uv = lngLatToUv([e.lngLat.lng, e.lngLat.lat]);
+    if (!uv) return;
+    if (grip.kind === "corner") {
+      r.uv[grip.i] = uv;
+    } else {
+      const dx = uv[0] - grip.from[0], dy = uv[1] - grip.from[1];
+      r.uv = r.uv.map(([u, v]) => [u + dx, v + dy]);
+      grip.from = uv;
+    }
+    redrawRooms();
+    return;
+  }
   if (dragIndex < 0) {
     // only offer the grab cursor when there is something to grab
     if (!draft && !adjusting) {
-      const over = pointIndexNear(e.lngLat) >= 0;
-      map.getCanvas().style.cursor = over ? "grab" : "";
+      const g = gripNear(e.lngLat);
+      const over = g || insideSelected(e.lngLat) || pointIndexNear(e.lngLat) >= 0;
+      map.getCanvas().style.cursor = g ? "pointer" : over ? "grab" : "";
     }
     return;
   }
@@ -3262,6 +3481,24 @@ map.on("mousemove", (e) => {
 });
 
 map.on("mouseup", () => {
+  if (grip) {
+    const moved = dragMoved;
+    grip = null;
+    dragMoved = false;
+    map.dragPan.enable();
+    map.getCanvas().style.cursor = "";
+    if (moved) {
+      // A room that has moved may now hold different nodes, and a node is
+      // routable because of the room it serves, so they are re-read.
+      redrawRooms();
+      markDirty();
+      setDrawHint("Reshaped.");
+    } else {
+      past.pop();            // nothing actually changed; do not spend an undo
+      updateUndoButtons();
+    }
+    return;
+  }
   if (dragIndex < 0) return;
   const moved = dragMoved;
   const r = rooms[dragIndex];
@@ -3636,6 +3873,10 @@ el("drawType").addEventListener("change", () => {
 });
 el("finishDraw").addEventListener("click", finishDraft);
 el("cancelDraw").addEventListener("click", cancelDraft);
+updateUndoButtons();
+el("undoEdit")?.addEventListener("click", undo);
+el("redoEdit")?.addEventListener("click", redo);
+
 el("undoPoint").addEventListener("click", () => {
   if (!draft) return;
   draft.pop();
@@ -3751,6 +3992,20 @@ window.addEventListener("keydown", (e) => {
       return;
     }
 
+    // Ctrl+Z / Ctrl+Shift+Z, the two everybody already knows
+    if ((e.ctrlKey || e.metaKey) && (e.key === "z" || e.key === "Z")) {
+      const t = e.target;
+      if (t && typeof t.matches === "function" && t.matches("input, select, textarea")) return;
+      e.preventDefault();
+      if (e.shiftKey) redo(); else undo();
+      return;
+    }
+    if ((e.ctrlKey || e.metaKey) && (e.key === "y" || e.key === "Y")) {
+      e.preventDefault();
+      redo();
+      return;
+    }
+
     // nothing being drawn: Delete removes whatever is selected
     if ((e.key === "Delete" || e.key === "Backspace") && selected >= 0) {
       const t = e.target;
@@ -3768,6 +4023,7 @@ window.addEventListener("keydown", (e) => {
 el("roomForm").addEventListener("submit", (e) => {
   e.preventDefault();
   if (editingIndex < 0) return;
+  remember();
   const form = e.target;
   const r = rooms[editingIndex];
   r.room = form.room.value.trim() || null;
