@@ -1,0 +1,4 @@
+# The contact sheets and the segmentation cache are rebuilt from the PDFs by
+# `trace_from_sheet.py cards`; only the numbers read off them are worth keeping.
+*.png
+*_seg.json
