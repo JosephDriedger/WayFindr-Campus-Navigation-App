@@ -344,7 +344,7 @@ def square_corners(poly, ink=None, max_cut=22.0, bare=0.55):
     return out if len(out) >= 3 else poly
 
 
-def bridge_doors(ink, pxm, widest=1.9, slack=1.35):
+def bridge_doors(ink, pxm, widest=2.2, slack=1.35):
     """Close the doorways, and only the doorways.
 
     Sealing a sheet by closing it everywhere is a blunt instrument: the kernel
@@ -358,6 +358,12 @@ def bridge_doors(ink, pxm, widest=1.9, slack=1.35):
     room behind it becomes a room; a lab standing open to the corridor across
     four metres gets nothing, and stays part of the corridor, which is the
     truth about it.
+
+    A double door is one door. Two leaves meeting in the middle read as a gap
+    about two metres across, and a width that only allowed for a single leaf
+    would leave every pair of them open -- which is most of the classrooms. The
+    allowance is set above a double door and well below the four-metre openings
+    that are genuinely not doorways at all.
     """
     solid = (ink < 200).astype(np.uint8)
     span = max(int(widest * pxm), 9)
@@ -657,8 +663,26 @@ def read_sheet(name, inks=({},), rot=0, pxm=None, grow=4, open_k=21,
                          m2=round(r["px"] / (pxm * pxm), 1),
                          ink=str(cfg.get("layers") or cfg.get("widths") or "sheet"))
                 chosen.append(r)
+    # Anything still unclaimed is a room no fill can close -- drawn from its
+    # walls instead, the way somebody tracing by hand would draw it.
+    if inks:
+        drawn = by_walls(name, inks[0], [r["poly"] for r in chosen], pxm)
+        for d in drawn:
+            if rot:
+                d["poly"] = [[H - 1 - q[1], q[0]] for q in d["poly"]]
+            chosen.append(d)
     out = sorted(chosen, key=lambda r: (r["label"][1], r["label"][0]))
+    # Snapping to the floor's wall lines is an improvement to a shape, not a
+    # licence to wreck it: on an outline with a notch in it, pulling two nearby
+    # vertices onto the same line can fold the boundary over itself. So the
+    # before is kept and handed back to any room the snapping spoiled.
+    from shapely.geometry import Polygon as _P
+    before = [list(map(list, r["poly"])) for r in out]
     snap_grid(out, snap)
+    for r, was in zip(out, before):
+        now = _P(r["poly"])
+        if not now.is_valid or now.area <= 0:
+            r["poly"] = was
     for i, r in enumerate(out):
         r["id"] = i
         if rot:
@@ -963,6 +987,117 @@ def circulation(name, cfg, rooms, min_m2=4.0):
                         label=found[0]["box"] if len(found) == 1 else None,
                         lcx=found[0]["cx"] if len(found) == 1 else float(cen2[i][0]),
                         lcy=found[0]["cy"] if len(found) == 1 else float(cen2[i][1])))
+    return out
+
+
+def sheet_labels(img, pxm):
+    """Every room label printed on the sheet, wherever it is."""
+    H, W = img.shape
+    whole = [[0, 0], [W-1, 0], [W-1, H-1], [0, H-1]]
+    return labels_in(img, whole)
+
+
+def _wall_run(mask, x, y, dx, dy, limit):
+    """How far from here to the first wall, going that way."""
+    H, W = mask.shape
+    for step in range(4, limit):
+        px, py = int(x + dx*step), int(y + dy*step)
+        if not (0 <= px < W and 0 <= py < H):
+            return step
+        if mask[py, px]:
+            return step
+    return limit
+
+
+def _clip_to_free(poly, taken, cx, cy, keep=0.25):
+    """The part of this rectangle no other room has already claimed."""
+    from shapely.geometry import Polygon, Point
+    from shapely.ops import unary_union
+    g = Polygon(poly)
+    if not g.is_valid or g.area <= 0:
+        return None
+    others = []
+    for t in taken:
+        o = Polygon(t)
+        if o.is_valid and o.area > 0:
+            others.append(o)
+    if others:
+        g = g.difference(unary_union(others).buffer(0.5))
+    if g.is_empty:
+        return None
+    if g.geom_type == "MultiPolygon":
+        here = [p for p in g.geoms if p.contains(Point(cx, cy))]
+        g = here[0] if here else max(g.geoms, key=lambda p: p.area)
+    if g.area < keep * Polygon(poly).area or not g.contains(Point(cx, cy)):
+        return None
+    ring = [[float(x), float(y)] for x, y in g.exterior.coords[:-1]]
+    # Squaring up an L cut out of a rectangle can fold the outline over itself.
+    # Better a slightly ragged room than one whose boundary crosses.
+    squared = rectify(list(ring))
+    return squared if Polygon(squared).is_valid else ring
+
+
+def by_walls(name, cfg, taken, pxm, reach_m=26.0, fan=5):
+    """Draw the rooms the fill could not close, the way a person would.
+
+    Some rooms cannot be flood-filled at all: a lab whose front is four metres
+    of open doorway is not a patch of floor with a wall round it, it is part of
+    the corridor as far as any fill is concerned, and no seal narrow enough to
+    keep the cupboards apart will ever shut it. Left there, a floor has a hole
+    in it where its biggest rooms should be.
+
+    But somebody tracing by hand would not hesitate. They would put the corner
+    where the two walls meet and run the fourth side straight across the
+    opening, along the line the corridor wall is already on. So: from the room's
+    own number, look outward in each of the four directions and stop at the
+    first wall. Several rays each way, and the middle answer taken, because one
+    ray in a doorway would otherwise run to the far side of the building. Then
+    the four edges are snapped to the lines the rest of the floor agrees on.
+    """
+    img = load(name)
+    ink = wall_ink(name, cfg.get("widths"), cfg.get("layers"), cfg.get("fills", False))
+    mask = (ink < 200).astype(np.uint8)
+    # A room already traced is a wall as far as this is concerned. Without that
+    # the ray runs straight through its neighbour and the rectangle ends up
+    # drawn over the top of it -- two rooms standing on the same floor.
+    for t in taken:
+        cv2.polylines(mask, [np.array(t, np.int32)], True, 1, 3)
+    mask = mask.astype(bool)
+    limit = int(reach_m * pxm)
+    out = []
+    for lab in sheet_labels(img, pxm):
+        cx, cy = lab["cx"], lab["cy"]
+        if any(cv2.pointPolygonTest(np.array(t, np.float32), (float(cx), float(cy)), False) >= 0
+               for t in taken):
+            continue
+        x, y, w, h = lab["box"]
+        spread = max(w, h) * 0.42
+        reach = {}
+        for name_d, (dx, dy) in (("l", (-1, 0)), ("r", (1, 0)), ("u", (0, -1)), ("d", (0, 1))):
+            runs = []
+            for k in range(fan):
+                off = (k - (fan-1)/2) / max((fan-1)/2, 1) * spread
+                ox, oy = (0, off) if dx else (off, 0)
+                runs.append(_wall_run(mask, cx+ox, cy+oy, dx, dy, limit))
+            runs.sort()
+            reach[name_d] = runs[len(runs)//2]
+        if min(reach.values()) < 6 or max(reach.values()) >= limit:
+            continue
+        poly = [[cx - reach["l"], cy - reach["u"]], [cx + reach["r"], cy - reach["u"]],
+                [cx + reach["r"], cy + reach["d"]], [cx - reach["l"], cy + reach["d"]]]
+        # Rays find a neighbour only when most of them run into it, so a small
+        # room off to one side gets driven straight over. Cutting the finished
+        # rectangle against what is already on the floor settles it either way:
+        # two rooms cannot stand on the same ground.
+        poly = _clip_to_free(poly, taken + [d["poly"] for d in out], cx, cy)
+        if poly is None:
+            continue
+        out.append(dict(poly=[[float(a), float(b)] for a, b in poly],
+                        label=lab["box"], lcx=cx, lcy=cy, seal=0, ink="walls",
+                        px=int(abs(reach["l"]+reach["r"]) * abs(reach["u"]+reach["d"])),
+                        cen=[float(cx), float(cy)]))
+    for r in out:
+        r["m2"] = round(r["px"]/(pxm*pxm), 1)
     return out
 
 
