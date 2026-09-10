@@ -219,6 +219,129 @@ def wall_ink(name, widths=None, layers=None, fills=False, thick=2):
 # ---------------------------------------------------------------------------
 # Patches of floor
 # ---------------------------------------------------------------------------
+def on_ink(ink, a, b, tol=4):
+    """What fraction of this edge has something drawn under it."""
+    n = max(int(np.hypot(b[0]-a[0], b[1]-a[1]) / 2), 1)
+    H, W = ink.shape
+    hit = 0
+    for t in np.linspace(0, 1, n):
+        x, y = int(round(a[0] + (b[0]-a[0])*t)), int(round(a[1] + (b[1]-a[1])*t))
+        x0, x1 = max(x-tol, 0), min(x+tol+1, W)
+        y0, y1 = max(y-tol, 0), min(y+tol+1, H)
+        if x0 < x1 and y0 < y1 and ink[y0:y1, x0:x1].any():
+            hit += 1
+    return hit / n
+
+
+def rectify(poly, slant=0.36):
+    """Make the outline out of horizontals and verticals, as the drawing is.
+
+    These floors are built on right angles, and every edge that comes back on a
+    slant is the segmentation's slant, not the building's: a wall found a pixel
+    further out at one end than the other, or a corner the brush rounded and the
+    simplifier cut across. Rounding it off edge by edge never quite works, because
+    what is wrong is not the corners but the edges either side of them.
+
+    So each edge is called horizontal or vertical -- whichever it is nearer, and
+    an edge more than `slant` off both is left alone, since some walls really do
+    run on the diagonal -- runs of the same kind are merged, each is squared to
+    the average of its ends, and the corners are put back where consecutive
+    edges now cross. The outline that comes out is the one somebody tracing by
+    eye would have drawn: along this wall, turn, along that one.
+    """
+    pts = [list(p) for p in poly]
+    n = len(pts)
+    if n < 4:
+        return pts
+    edges = []
+    for i in range(n):
+        a, b = pts[i], pts[(i + 1) % n]
+        dx, dy = abs(b[0] - a[0]), abs(b[1] - a[1])
+        if dx == 0 and dy == 0:
+            continue
+        if dy <= slant * dx:
+            edges.append(["h", a, b])
+        elif dx <= slant * dy:
+            edges.append(["v", a, b])
+        else:
+            edges.append(["free", a, b])
+    if not any(e[0] != "free" for e in edges):
+        return pts
+    # merge neighbouring edges that face the same way, so one wall is one line
+    merged = []
+    for e in edges:
+        if merged and merged[-1][0] == e[0] != "free":
+            merged[-1][2] = e[2]
+        else:
+            merged.append(e)
+    if len(merged) > 1 and merged[0][0] == merged[-1][0] != "free":
+        merged[0][1] = merged[-1][1]
+        merged.pop()
+    if len(merged) < 3:
+        return pts
+    # each wall becomes one line; a free edge keeps the two ends it had
+    lines = []
+    for kind, a, b in merged:
+        if kind == "h":
+            lines.append(("h", (a[1] + b[1]) / 2))
+        elif kind == "v":
+            lines.append(("v", (a[0] + b[0]) / 2))
+        else:
+            lines.append(("free", (list(a), list(b))))
+    out = []
+    for i, cur in enumerate(lines):
+        nxt = lines[(i + 1) % len(lines)]
+        if cur[0] == "h" and nxt[0] == "v":
+            out.append([nxt[1], cur[1]])
+        elif cur[0] == "v" and nxt[0] == "h":
+            out.append([cur[1], nxt[1]])
+        elif cur[0] == "free":
+            out.extend([list(cur[1][0]), list(cur[1][1])])
+        elif nxt[0] == "free":
+            out.append(list(nxt[1][0]))
+        else:
+            out.append(list(merged[i][2]))
+    keep = []
+    for i, q in enumerate(out):
+        if not keep or abs(keep[-1][0] - q[0]) > 0.5 or abs(keep[-1][1] - q[1]) > 0.5:
+            keep.append(q)
+    return keep if len(keep) >= 3 else pts
+
+
+def square_corners(poly, ink=None, max_cut=22.0, bare=0.55):
+    """Run each pair of walls on to where they cross, instead of cutting across.
+
+    Whatever rounding survives the brush arrives here as a diagonal between two
+    square edges -- the corner of the room with its point sawn off. The room's
+    own two walls already say where that point was: it is where their lines
+    meet. So the stub goes and the corner comes back, which is what following
+    the drawing means.
+
+    Short stubs are always rounding. A long diagonal might be a real wall built
+    on the skew, so those are only cut when there is nothing drawn under them:
+    an outline edge running over blank paper is not tracing anything.
+    """
+    n = len(poly)
+    if n < 4:
+        return poly
+    skip = set()
+    for i in range(n):
+        a, b, c, d = poly[i], poly[(i+1) % n], poly[(i+2) % n], poly[(i+3) % n]
+        span = np.hypot(c[0]-b[0], c[1]-b[1])
+        if span > max_cut and (ink is None or on_ink(ink, b, c) >= bare):
+            continue
+        ah, av = abs(a[1]-b[1]) < 1.5, abs(a[0]-b[0]) < 1.5
+        dh, dv = abs(c[1]-d[1]) < 1.5, abs(c[0]-d[0]) < 1.5
+        if ah and dv:
+            poly[(i+1) % n] = [d[0], a[1]]
+            skip.add((i+2) % n)
+        elif av and dh:
+            poly[(i+1) % n] = [a[0], d[1]]
+            skip.add((i+2) % n)
+    out = [q for i, q in enumerate(poly) if i not in skip]
+    return out if len(out) >= 3 else poly
+
+
 def simplify(contour, eps_px=6.0, snap_px=7.0):
     """Cut the wiggle out of a traced outline and square up its near-axis edges."""
     poly = cv2.approxPolyDP(contour, eps_px, True).reshape(-1, 2).astype(float)
@@ -246,11 +369,16 @@ def patches(ink, close, grow, min_px, max_px, open_k=21):
     """Every enclosed patch of white on the sheet, as a polygon on the wall line."""
     H, W = ink.shape
     mask = (ink < 200).astype(np.uint8)
-    k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (close, close))
+    # Square brushes throughout. A disc rounds off every corner it passes, and a
+    # rounded corner is a corner the simplifier reads as a 45-degree chamfer --
+    # which is how a stairwell that is a rectangle on the sheet came out an
+    # octagon. Rooms on these plans meet at right angles; the brush should not
+    # be the thing that says otherwise.
+    k = cv2.getStructuringElement(cv2.MORPH_RECT, (close, close))
     free = (1 - cv2.morphologyEx(mask, cv2.MORPH_CLOSE, k)).astype(np.uint8)
     n, lab, stats, cent = cv2.connectedComponentsWithStats(free, 4)
-    gk = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2*grow+1, 2*grow+1))
-    ok = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (open_k, open_k)) if open_k else None
+    gk = cv2.getStructuringElement(cv2.MORPH_RECT, (2*grow+1, 2*grow+1))
+    ok = cv2.getStructuringElement(cv2.MORPH_RECT, (open_k, open_k)) if open_k else None
     out = []
     for i in range(1, n):
         x, y, w, h, a = stats[i]
@@ -280,9 +408,11 @@ def patches(ink, close, grow, min_px, max_px, open_k=21):
         sub = cv2.dilate(sub, gk)
         cs, _ = cv2.findContours(sub, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         poly = simplify(max(cs, key=cv2.contourArea)) + np.array([x - pad, y - pad], float)
+        poly = square_corners([[float(q[0]), float(q[1])] for q in poly], mask)
+        poly = rectify(poly)
         out.append(dict(px=int(a), bbox=[int(x), int(y), int(w), int(h)],
                         cen=[float(cent[i][0]), float(cent[i][1])],
-                        poly=[[round(float(p[0]), 1), round(float(p[1]), 1)] for p in poly]))
+                        poly=[[round(float(q[0]), 1), round(float(q[1]), 1)] for q in poly]))
     return out
 
 
@@ -668,18 +798,46 @@ def write_floor(name, seg, labels):
     return {"type": "FeatureCollection", "features": feats}
 
 
-def read_labels(path):
-    out = {}
-    with open(path, encoding="utf-8") as fh:
-        for line in fh:
-            line = line.split("#")[0].strip()
-            if not line:
+def read_labels(path, seg):
+    """The numbers read off the cards, matched back to the rooms they are for.
+
+    A card number is an ordinal: improve the reading of the sheet and every one
+    of them moves, silently reattaching hand-read numbers to whichever rooms
+    now hold those positions. That is the same class of mistake as the ones the
+    cards exist to catch, so a line is keyed on where its label is printed on
+    the sheet instead -- a fact about the drawing, which does not move. Lines
+    are written by hand as card numbers and rewritten to positions on first use.
+    """
+    rooms = {r["id"]: r for r in seg["rooms"]}
+    anchors = [(r["lcx"], r["lcy"], r) for r in seg["rooms"]]
+    out, rewritten, head = {}, [], []
+    for line in open(path, encoding="utf-8"):
+        raw = line.rstrip()
+        body = raw.split("#")[0].strip()
+        if not body:
+            head.append(raw)
+            continue
+        bits = body.split()
+        if len(bits) < 3:
+            print("   ignoring %r: wanted '<card #> <room> <USE-CODE>'" % body)
+            continue
+        where, room, code = bits[0], bits[1], bits[2]
+        if "," in where:                       # already a position
+            x, y = (float(v) for v in where.split(","))
+            near = [(math.hypot(ax-x, ay-y), r) for ax, ay, r in anchors]
+            d, r = min(near, key=lambda t: t[0]) if near else (1e9, None)
+            if r is None or d > 25:
+                print("   no room now has a label at %s (%s), skipped" % (where, room))
                 continue
-            bits = line.split()
-            if len(bits) < 3:
-                print("   ignoring %r: wanted '<card> <room> <USE-CODE>'" % line)
+        else:
+            r = rooms.get(int(where))
+            if r is None:
+                print("   card #%s is not on the sheet any more, skipped" % where)
                 continue
-            out[int(bits[0])] = (bits[1], bits[2])
+        out[r["id"]] = (room, code)
+        rewritten.append("%.0f,%.0f %s %s" % (r["lcx"], r["lcy"], room, code))
+    with open(path, "w", encoding="utf-8") as fh:
+        fh.write(os.linesep.join(head + sorted(rewritten, key=lambda l: l.split()[1])) + os.linesep)
     return out
 
 
@@ -718,7 +876,7 @@ def main():
         lab_path = os.path.join(WORK_DIR, name + ".txt")
         if not os.path.exists(lab_path):
             raise SystemExit("no %s yet: run `cards %s` and read them" % (lab_path, name))
-        fc = write_floor(name, seg, read_labels(lab_path))
+        fc = write_floor(name, seg, read_labels(lab_path, seg))
         out = os.path.join(OUT_DIR, name + ".geojson")
         with open(out, "w", encoding="utf-8") as fh:
             json.dump(fc, fh, indent=1)
