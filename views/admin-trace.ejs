@@ -12,14 +12,21 @@
 </head>
 
 <body class="tracer-body">
-  <%- include('_menu', { page: 'admin', user: user }) %>
+  <%- include('_menu', { page: 'tracer', user: user }) %>
 
   <div class="tracer-shell">
     <aside class="tracer-panel">
       <section class="tracer-block">
         <h3>Floor Plan</h3>
         <select id="planPicker" aria-label="Floor plan"></select>
-        <p class="tracer-hint" id="planStatus">Pick a floor to start.</p>
+        <p class="tracer-hint" id="planStatus">Pick a Floor to Start.</p>
+        <!-- Where a sheet comes from, and where a reissued one goes. Sitting
+             beside the picker because that is where you find out the drawing
+             you are tracing is out of date. -->
+        <p class="tracer-hint">
+          <a href="/admin/plans">Floor Plans</a> — Add a Sheet, or Replace One
+          BCIT Has Reissued.
+        </p>
 
         <!-- The network is the whole campus and every traced sheet is drawn
              as context, so floor 1 used to sit directly underneath floor 2
@@ -29,8 +36,8 @@
              it up against. -->
         <label class="tracer-toggle" id="floorFocusField" hidden>
           <input type="checkbox" id="floorFocus" checked>
-          <span>Only this floor
-            <small id="floorFocusCount">stairs and lifts still show</small>
+          <span>Only This Floor
+            <small id="floorFocusCount">Stairs and Lifts Still Show</small>
           </span>
         </label>
       </section>
@@ -76,6 +83,8 @@
         </label>
         <div class="tracer-row">
           <button type="button" id="startDraw" class="tracer-primary">Draw</button>
+          <button type="button" id="undoEdit" disabled title="Ctrl+Z">Undo</button>
+          <button type="button" id="redoEdit" disabled title="Ctrl+Shift+Z">Redo</button>
         </div>
         <div class="tracer-row" id="draftControls" hidden>
           <button type="button" id="finishDraw" class="tracer-primary">Finish Room</button>
@@ -83,15 +92,20 @@
           <button type="button" id="cancelDraw">Cancel</button>
         </div>
         <p class="tracer-hint" id="drawHint">
-          Click each corner, then Finish. Double-click also closes it;
-          Backspace undoes a corner and Esc cancels.
+          Click Each Corner, Then Finish. Double-Click Also Closes It;
+          Backspace Undoes a Corner and Esc Cancels.
+        </p>
+        <p class="tracer-hint">
+          Select a Room to Reshape It: Drag a Corner to Move It, Drag the
+          Middle to Move the Whole Room, Drag a Small Hollow Handle to Add a
+          Corner, Alt-Click a Corner to Remove One. Ctrl+Z Takes Back Anything.
         </p>
 
         <details class="tracer-details" id="planImageBlock">
           <summary>Plan Image</summary>
           <p class="tracer-hint">
-            Trace the floor first — outlines stick to the drawing. Then line
-            the finished floor up with the building and it all moves together.
+            Trace the Floor First — Outlines Stick to the Drawing. Then Line
+            the Finished Floor Up with the Building and It All Moves Together.
           </p>
           <label class="tracer-field">
             <span>Transparency <output id="opacityOut">65%</output></span>
@@ -100,7 +114,7 @@
           </label>
           <div class="tracer-row">
             <button type="button" id="togglePlan">Hide Plan</button>
-            <span class="tracer-saved">or hold H to peek</span>
+            <span class="tracer-saved">Or Hold H to Peek</span>
           </div>
           <div class="tracer-row">
             <button type="button" id="fitBuilding">Fit to Building</button>
@@ -110,8 +124,8 @@
             <button type="button" id="adjustToggle">Move / Rotate Plan</button>
           </div>
           <p class="tracer-hint" id="adjustHint" hidden>
-            Drag the blue handle to move, the orange corner to resize, and the
-            green stalk to rotate. Each does one thing only.
+            Drag the Blue Handle to Move, the Orange Corner to Resize, and the
+            Green Stalk to Rotate. Each Does One Thing Only.
           </p>
 
           <div class="tracer-adjust">
@@ -157,9 +171,9 @@
       <section class="tracer-block" id="networkMode" hidden>
         <h3>Network <span class="tracer-count" id="netCount">0</span></h3>
         <p class="tracer-hint">
-          One network for the whole campus. It is the same whichever floor you
-          have open, so you can run a path out of a door, across the grass and
-          into the next building.
+          One Network for the Whole Campus. It Is the Same Whichever Floor You
+          Have Open, so You Can Run a Path Out of a Door, Across the Grass and
+          into the Next Building.
         </p>
 
         <!-- Filled in by renderZoneKey(). A node's colour says where it
@@ -224,12 +238,12 @@
             <button type="button" id="bridgeShow">Show Both Floors</button>
           </div>
           <p class="tracer-hint" id="bridgeHint">
-            Pick the two places you want someone to be able to walk between.
+            Pick the Two Places You Want Someone to Be Able to Walk Between.
           </p>
         </div>
         <p class="tracer-hint" id="netHint">
-          Click where someone can stand. A node inside a building belongs to
-          it, which is what makes that building routable.
+          Click Where Someone Can Stand. A Node Inside a Building Belongs to
+          It, Which Is What Makes That Building Routable.
         </p>
         <div class="tracer-row" id="netTools">
           <button type="button" id="autoName">Name Nodes</button>
@@ -253,13 +267,13 @@
              finding anything. Only a page of rows is drawn, and this is how
              you narrow it. -->
         <input type="search" id="nodeFilter" class="tracer-filter"
-               placeholder="Filter nodes…" autocomplete="off" aria-label="Filter nodes">
+               placeholder="Filter Nodes…" autocomplete="off" aria-label="Filter nodes">
         <ul class="tracer-rooms tracer-rooms-half" id="nodeList"></ul>
         <p class="tracer-hint" id="nodeMore" hidden></p>
 
         <h4 class="tracer-subhead">Links <span class="tracer-count" id="linkCount">0</span></h4>
         <input type="search" id="linkFilter" class="tracer-filter"
-               placeholder="Filter links…" autocomplete="off" aria-label="Filter links">
+               placeholder="Filter Links…" autocomplete="off" aria-label="Filter links">
         <ul class="tracer-rooms tracer-rooms-half" id="linkList"></ul>
         <p class="tracer-hint" id="linkMore" hidden></p>
       </section>
@@ -271,8 +285,8 @@
           <span class="tracer-saved" id="saveState"></span>
         </div>
         <p class="tracer-hint">
-          Saving writes what you traced and rebuilds search and routing, so the
-          app has it straight away.
+          Saving Writes What You Traced and Rebuilds Search and Routing, so the
+          App Has It Straight Away.
         </p>
         <div class="tracer-row">
           <button type="button" id="rebuild">Rebuild Only</button>
@@ -308,8 +322,8 @@
         </select>
       </label>
       <label class="tracer-field" id="nameField">
-        <span>Name <small>(optional)</small></span>
-        <input type="text" name="name" placeholder="Lecture theatre" autocomplete="off">
+        <span>Name <small>(Optional)</small></span>
+        <input type="text" name="name" placeholder="Lecture Theatre" autocomplete="off">
       </label>
 
       <!-- What a room OFFERS, as opposed to what it is for routing. A
@@ -317,7 +331,7 @@
            what makes it worth marking on the map with a symbol, and what a
            "nearest washroom" search would look for. -->
       <label class="tracer-field" id="amenityField">
-        <span>Amenity <small>(optional)</small></span>
+        <span>Amenity <small>(Optional)</small></span>
         <select name="amenity">
           <option value="">None</option>
           <option value="washroom">Washroom</option>

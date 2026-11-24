@@ -17,12 +17,12 @@
       <div class="hero-content">
         <h2>Find Your Way Around BCIT</h2>
         <p>
-          Search any room on the Burnaby campus, see it drawn on its floor plan,
-          and get walking directions to the door.
+          Search Any Room on the Burnaby Campus, See It Drawn on Its Floor Plan,
+          and Get Walking Directions to the Door.
         </p>
 
         <form class="home-search" action="/map" method="get">
-          <input type="text" name="room" placeholder="Room or building, e.g. SW3-1600" aria-label="Room or building">
+          <input type="text" name="room" placeholder="Room or Building, e.g. SW3-1600" aria-label="Room or building">
           <button type="submit" class="btn">Search</button>
         </form>
 
@@ -37,15 +37,15 @@
     <section class="home-stats">
       <div class="stat">
         <span class="stat-number"><%= coverage.buildings %></span>
-        <span class="stat-label">buildings mapped</span>
+        <span class="stat-label">Buildings Mapped</span>
       </div>
       <div class="stat">
         <span class="stat-number"><%= coverage.floors %></span>
-        <span class="stat-label">floors</span>
+        <span class="stat-label">Floors</span>
       </div>
       <div class="stat">
         <span class="stat-number"><%= coverage.rooms.toLocaleString('en-CA') %></span>
-        <span class="stat-label">rooms you can search</span>
+        <span class="stat-label">Rooms You Can Search</span>
       </div>
     </section>
     <% } %>
@@ -56,32 +56,32 @@
         <article class="feature">
           <h4>Search for a Room</h4>
           <p>
-            Type a room number and go straight to it. Every room is drawn in
-            place on its own floor plan, so you can see what it is next to
-            before you set off.
+            Type a Room Number and Go Straight to It. Every Room Is Drawn in
+            Place on Its Own Floor Plan, so You Can See What It Is Next to
+            Before You Set Off.
           </p>
         </article>
         <article class="feature">
           <h4>Move Between Floors</h4>
           <p>
-            Pick a building and step through its floors. Each floor lists the
-            rooms on it, so you can find what you want without hunting across
-            the drawing.
+            Pick a Building and Step Through Its Floors. Each Floor Lists the
+            Rooms on It, so You Can Find What You Want Without Hunting Across
+            the Drawing.
           </p>
         </article>
         <article class="feature">
           <h4>Get Walking Directions</h4>
           <p>
-            Give it two rooms and it routes between them along the corridors,
-            taking the stairs or the lift where the floors change, and draws
-            the path on the map.
+            Give It Two Rooms and It Routes Between Them Along the Corridors,
+            Taking the Stairs or the Lift Where the Floors Change, and Draws
+            the Path on the Map.
           </p>
         </article>
         <article class="feature">
           <h4>Save the Places You Keep Going Back To</h4>
           <p>
-            Star a room to keep it on your favourites list. This is the one
-            part that needs an account, since it is tied to you.
+            Star a Room to Keep It on Your Favourites List. This Is the One
+            Part That Needs an Account, Since It Is Tied to You.
           </p>
         </article>
       </div>
@@ -90,17 +90,18 @@
     <section class="home-how">
       <h3>Where the Maps Come From</h3>
       <p>
-        The floor plans are built from BCIT's own published architectural
-        drawings. Each sheet is read, the rooms are traced from the walls, and
-        the result is fitted to the building's real footprint so a room on
-        screen sits where it does on campus. Corridors, doorways, stairs and
-        lifts are picked out of the same drawings, which is what makes indoor
-        routing possible.
+        The Floor Plans Are Built from BCIT's Own Published Architectural
+        Drawings. Each Sheet Is Read, the Rooms Are Traced from the Walls, and
+        the Result Is Fitted to the Building's Real Footprint so a Room on
+        Screen Sits Where It Does on Campus. Corridors, Doorways, Stairs and
+        Lifts Are Picked Out of the Same Drawings, Which Is What Makes Indoor
+        Routing Possible.
       </p>
       <p class="home-note">
-        Room labels are read from the drawings automatically, so a few will be
-        wrong or missing. If a room looks off, it is the reading of the plan
-        that is wrong, not the building.
+        Room Numbers Are Read Off the Sheets by Hand — in These Drawings a
+        Label Is Line Work Rather than Text, so There Is Nothing for a Machine
+        to Read. A Few Will Be Wrong or Missing. If a Room Looks Off, It Is the
+        Reading of the Plan That Is Wrong, Not the Building.
       </p>
     </section>
   </main>

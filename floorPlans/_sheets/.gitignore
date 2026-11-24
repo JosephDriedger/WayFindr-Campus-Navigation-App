@@ -1,0 +1,11 @@
+# Contact sheets and the segmentation cache are rebuilt from the PDFs by
+# `trace_from_sheet.py cards`. Only the numbers read off them are worth keeping
+# -- and only once they have actually been read, one card at a time, which is
+# what .unverified means when it is still on the end of a name.
+*.png
+*_seg.json
+*.unverified
+
+# What the OCR saw on each label, kept so a bad reading can be traced back to
+# the glyphs that caused it. Rebuilt by `read_sheet_auto.py`.
+*_ocr.json

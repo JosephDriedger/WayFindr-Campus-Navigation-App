@@ -11,7 +11,13 @@ Pages are cropped to their ink before saving: BCIT sheets sit inside a wide
 title border, and keeping it would mean the useful drawing occupies a fraction
 of the overlay and every placement starts by scaling the border off-screen.
 
-Usage: py -3 floorPlans/render_plan_images.py [--zoom 3] [--force] [BUILDING]
+Each entry in _index.json also records where the crop sat on the page. That is
+what lets a re-rendered sheet keep the position it was given on the map: the
+crop follows the ink, so a revised drawing crops differently, and without both
+boxes the only way to tell how far the picture moved is to look at it. With
+them it is arithmetic -- see services/planLibrary.js.
+
+Usage: py -3 floorPlans/render_plan_images.py [--zoom 3] [--force] [BUILDING] [--floor N]
 Output: public/data/floorplan-images/{CODE}-Floor{N}.png  (+ _index.json)
 """
 import sys, os, re, json, glob, argparse
@@ -45,13 +51,21 @@ def ink_bbox(pix):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("building", nargs="?")
+    # One sheet at a time, for the upload route: replacing SW1's second floor
+    # should not re-render the four floors that did not change.
+    ap.add_argument("--floor", help="only this floor of that building")
     ap.add_argument("--zoom", type=float, default=3.0,
                     help="render scale; 3 gives ~216 dpi, enough to trace from")
     ap.add_argument("--force", action="store_true", help="re-render existing images")
     args = ap.parse_args()
 
     os.makedirs(OUT_DIR, exist_ok=True)
-    pattern = f"{args.building}-Floor*.pdf" if args.building else "*-Floor*.pdf"
+    if args.building and args.floor:
+        pattern = f"{args.building}-Floor{args.floor}.pdf"
+    elif args.building:
+        pattern = f"{args.building}-Floor*.pdf"
+    else:
+        pattern = "*-Floor*.pdf"
     pdfs = sorted(glob.glob(os.path.join(PDF_DIR, pattern)))
     if not pdfs:
         print(f"no PDFs matching {pattern} in {PDF_DIR}")
@@ -78,8 +92,9 @@ def main():
         try:
             doc = fitz.open(pdf)
             page = doc[0]
-            pix = page.get_pixmap(matrix=fitz.Matrix(args.zoom, args.zoom))
-            box = ink_bbox(pix)
+            full = page.get_pixmap(matrix=fitz.Matrix(args.zoom, args.zoom))
+            pix = full
+            box = ink_bbox(full)
             if box:
                 x0, y0, x1, y1 = box
                 clip = fitz.Rect(x0 / args.zoom, y0 / args.zoom,
@@ -90,6 +105,13 @@ def main():
                 "building": m.group(1), "floor": m.group(2),
                 "image": f"/data/floorplan-images/{stem}.png",
                 "width": pix.width, "height": pix.height,
+                # The uncropped page, and the window taken out of it, in
+                # rendered pixels. A new picture of a sheet can only be laid
+                # where the old one was if both say which part of the page
+                # they are.
+                "page": [full.width, full.height],
+                "crop": list(box) if box else [0, 0, full.width - 1, full.height - 1],
+                "zoom": args.zoom,
             }
             done += 1
             print(f"[OK] {stem}: {pix.width}x{pix.height}")

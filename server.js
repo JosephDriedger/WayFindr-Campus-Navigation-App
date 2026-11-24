@@ -16,6 +16,7 @@ import calibratorRouter from "./routes/calibrator.js";
 import FileSessionStore from "./services/sessionStore.js";
 import { requestLogger } from "./middleware/logger.js";
 import { errorHandler } from './middleware/errorHandler.js';
+import { isAdmin } from "./middleware/authMiddleware.js";
 import { getFirestore } from './config/firebase.js';
 
 dotenv.config();
@@ -92,6 +93,16 @@ app.use(session({
 
 app.set("view engine", "ejs");
 app.use(express.urlencoded({ extended: true }));
+
+// Whether the person looking at a page maintains the map, decided in one
+// place and readable from every view -- including the shared menu, which is
+// what decides whether the Tracer and Plans links exist at all. Working it
+// out per route would mean every render remembering to pass it, and the one
+// that forgot would show a student a link to a page that refuses them.
+app.use((req, res, next) => {
+  res.locals.isAdmin = isAdmin(req.session?.user);
+  next();
+});
 
 app.use("/calibrator", calibratorRouter);
 app.use('/auth', authRouter);

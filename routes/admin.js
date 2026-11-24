@@ -15,11 +15,23 @@ import express from "express";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { execFile } from "child_process";
-import { checkSession } from "../middleware/authMiddleware.js";
+import { requireAdmin } from "../middleware/authMiddleware.js";
 import { invalidateCache } from "../services/indoorGraph.js";
 import { applyDelta, featureKey, danglingLinks } from "../services/networkDelta.js";
 import { placeAt } from "../services/places.js";
+import {
+  listPlans,
+  uploadHistory,
+  versionsOf,
+  replacePlan,
+  restoreVersion,
+  runPython,
+  stemFor,
+  parsePlanName,
+  PlanError,
+  MAX_BYTES,
+} from "../services/planLibrary.js";
+import { listUsers, setAdmin, UserAdminError } from "../services/userAdmin.js";
 
 const router = express.Router();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -34,19 +46,20 @@ const CODE = /^[A-Za-z][A-Za-z0-9]{0,7}$/;
 const FLOOR = /^[0-9]{1,3}$/;
 
 /**
- * Whether the tracer needs a login.
+ * Everything under /admin is for the people who maintain the map.
  *
- * Off by default while the campus is being traced: requiring a session made
- * every /admin/api call answer with the login PAGE, and the tracer tried to
- * read that HTML as JSON -- which surfaced as "Unexpected token '<'" and a
- * floor list that never loaded.
+ * These routes overwrite floor data, replace BCIT's drawings and start the
+ * rebuild scripts, so they are not gated on being signed in -- a student with
+ * an account is still a student -- but on being an administrator. Who counts
+ * as one is in middleware/authMiddleware.js: the `admin` claim on their
+ * Firebase account, and nothing else.
  *
- * Worth turning back on before this is reachable by anyone else: these routes
- * overwrite floor data and start the rebuild scripts, so with it off anyone
- * who can reach the server can do both. Set ADMIN_REQUIRE_LOGIN=true.
+ * The guard answers an /admin/api call with JSON rather than the login page,
+ * which is what makes it usable from the tracer: sent HTML where it expected
+ * data, the page failed with "Unexpected token '<'" and a floor list that
+ * never loaded.
  */
-const requireLogin = process.env.ADMIN_REQUIRE_LOGIN === "true";
-const guard = requireLogin ? checkSession : (req, res, next) => next();
+const guard = requireAdmin;
 
 function floorFile(building, floor) {
   if (!CODE.test(building) || !FLOOR.test(floor)) return null;
@@ -61,13 +74,76 @@ const readJson = (p, fallback) => {
   }
 };
 
+/**
+ * What the campus map currently consists of, for the landing page.
+ *
+ * Counted from the files the app actually serves rather than kept as a tally
+ * somewhere, because every one of these numbers moves whenever somebody
+ * traces a floor, and a number that can go stale is worse than no number: it
+ * is read as a fact.
+ */
+function dashboardSummary() {
+  const index = readJson(path.join(DATA, "room-search-index.json"), { rooms: [] });
+  const rooms = Array.isArray(index.rooms) ? index.rooms : [];
+  const buildings = new Set();
+  const floors = new Set();
+  for (const r of rooms) {
+    if (!r.building) continue;
+    buildings.add(r.building);
+    if (r.floor) floors.add(`${r.building}|${r.floor}`);
+  }
+
+  const network = tally(readNetwork().features);
+  const plans = listPlans();
+  const traced = plans.filter((p) => p.traced > 0).length;
+
+  return {
+    rooms: rooms.length,
+    buildings: buildings.size,
+    floors: floors.size,
+    nodes: network.nodes,
+    links: network.links,
+    sheets: plans.length,
+    traced,
+    untraced: plans.length - traced,
+    unplaced: plans.filter((p) => !p.placed).length,
+    recent: uploadHistory(5),
+  };
+}
+
+/**
+ * The admin landing page: what the map is made of, and the way into each tool.
+ *
+ * /admin used to BE the tracer. It is now the front door, because there is
+ * more than one tool behind it and a person arriving needs to choose. An old
+ * link carrying a floor still means "open this in the tracer", so it is sent
+ * there rather than dropped on a page that does not draw anything.
+ */
 router.get("/", guard, (req, res) => {
-  res.render("admin-trace", {
+  if (req.query.plan) {
+    return res.redirect(`/admin/tracer?plan=${encodeURIComponent(req.query.plan)}`);
+  }
+  res.render("admin-dashboard", {
     page: "admin",
+    title: "Wayfindr - Admin",
+    user: req.session?.user,
+    summary: dashboardSummary(),
+  });
+});
+
+router.get("/tracer", guard, (req, res) => {
+  res.render("admin-trace", {
+    page: "tracer",
     title: "Wayfindr - Floor Plan Tracer",
     MAPBOX_TOKEN: process.env.MAPBOX_TOKEN,
     user: req.session?.user,
   });
+});
+
+/** The old address of the tracer, kept working for anything that saved it. */
+router.get("/trace", guard, (req, res) => {
+  const qs = new URLSearchParams(req.query).toString();
+  res.redirect(qs ? `/admin/tracer?${qs}` : "/admin/tracer");
 });
 
 /** Which floors have a rendered plan image, and which are already traced. */
@@ -155,19 +231,19 @@ function checkFeatures(features, { nodeIds = null } = {}) {
     const props = f?.properties || {};
     if (props.type === "node") {
       if (g?.type !== "Point" || !Array.isArray(g.coordinates) || g.coordinates.length !== 2) {
-        return "A node needs a position";
+        return "A Node Needs a Position";
       }
       if (!props.nid || typeof props.nid !== "string") {
-        return "A node needs an id, or nothing can link to it";
+        return "A Node Needs an Id, or Nothing Can Link to It";
       }
       ids.add(props.nid);
     } else if (props.type === "path") {
       const n = props.nodes;
       if (!Array.isArray(n) || n.length !== 2 || n.some((v) => typeof v !== "string")) {
-        return "A link must name the two nodes it joins";
+        return "A Link Must Name the Two Nodes It Joins";
       }
     } else {
-      return "The network holds nodes and links only";
+      return "The Network Holds Nodes and Links Only";
     }
   }
   return null;
@@ -289,7 +365,7 @@ router.put("/api/network", guard, (req, res) => {
   if (bad) return res.status(400).json({ error: bad });
 
   const dupes = fc.features.filter((f) => f.properties?.type === "node").length !== ids.size;
-  if (dupes) return res.status(400).json({ error: "Two nodes share an id" });
+  if (dupes) return res.status(400).json({ error: "Two Nodes Share an Id" });
 
   const unresolved = checkLinksResolve(fc.features);
   if (unresolved) return res.status(400).json({ error: unresolved });
@@ -303,8 +379,8 @@ router.put("/api/network", guard, (req, res) => {
   if (had > 10 && ids.size < had / 2 && !forced) {
     return res.status(409).json({
       error: `This would cut the network from ${had} nodes to ${ids.size}. `
-        + "If that is deliberate, save again with force set; otherwise reload "
-        + "the tracer, because it is probably working from an empty copy.",
+        + "If That Is Deliberate, Save Again with Force Set; Otherwise Reload "
+        + "The Tracer, Because It Is Probably Working from an Empty Copy.",
       had,
       now: ids.size,
     });
@@ -340,16 +416,16 @@ router.patch("/api/network", guard, (req, res) => {
   const { baseVersion, add = [], update = [], remove = [] } = req.body || {};
 
   if (!Number.isInteger(baseVersion)) {
-    return res.status(400).json({ error: "A change has to say which version it is a change to" });
+    return res.status(400).json({ error: "A Change Has to Say Which Version It Is a Change To" });
   }
   if (![add, update, remove].every(Array.isArray)) {
-    return res.status(400).json({ error: "add, update and remove are lists" });
+    return res.status(400).json({ error: "Add, Update and Remove Are Lists" });
   }
 
   const current = readNetwork();
   if (baseVersion !== current.version) {
     return res.status(409).json({
-      error: "The network has changed since you loaded it. Reload before saving.",
+      error: "The Network Has Changed Since You Loaded It. Reload Before Saving.",
       yours: baseVersion,
       current: current.version,
       conflict: true,
@@ -360,10 +436,10 @@ router.patch("/api/network", guard, (req, res) => {
   const bad = checkFeatures(incoming);
   if (bad) return res.status(400).json({ error: bad });
   if (incoming.some((f) => !featureKey(f))) {
-    return res.status(400).json({ error: "Every feature in a change needs an id" });
+    return res.status(400).json({ error: "Every Feature in a Change Needs an Id" });
   }
   if (remove.some((k) => typeof k !== "string")) {
-    return res.status(400).json({ error: "remove is a list of feature ids" });
+    return res.status(400).json({ error: "Remove Is a List of Feature Ids" });
   }
 
   const merged = applyDelta(current.features, { add, update, remove });
@@ -430,31 +506,31 @@ router.put("/api/floor/:building/:floor", guard, (req, res) => {
     const g = f?.geometry;
     if (g?.type === "Polygon") {
       if (!Array.isArray(g.coordinates?.[0]) || g.coordinates[0].length < 4) {
-        return res.status(400).json({ error: "An outline needs at least three corners" });
+        return res.status(400).json({ error: "An Outline Needs at Least Three Corners" });
       }
     } else if (g?.type === "Point") {
       if (!Array.isArray(g.coordinates) || g.coordinates.length !== 2) {
-        return res.status(400).json({ error: "A marker needs a position" });
+        return res.status(400).json({ error: "A Marker Needs a Position" });
       }
       // What a marker joins is a pair of names the router looks up, so it has
       // to be a short list of strings and nothing else.
       const c = f.properties?.connects;
       if (c !== undefined) {
         if (!Array.isArray(c) || c.length > 2 || c.some((v) => typeof v !== "string")) {
-          return res.status(400).json({ error: "A marker connects at most two named spaces" });
+          return res.status(400).json({ error: "A Marker Connects at Most Two Named Spaces" });
         }
       }
     } else if (g?.type === "LineString") {
       // a walking path: two ends, and the pair of node ids it joins
       const n = f.properties?.nodes;
       if (!Array.isArray(g.coordinates) || g.coordinates.length !== 2) {
-        return res.status(400).json({ error: "A path runs between two points" });
+        return res.status(400).json({ error: "A Path Runs Between Two Points" });
       }
       if (!Array.isArray(n) || n.length !== 2 || n.some((v) => typeof v !== "string")) {
-        return res.status(400).json({ error: "A path must name the two nodes it joins" });
+        return res.status(400).json({ error: "A Path Must Name the Two Nodes It Joins" });
       }
     } else {
-      return res.status(400).json({ error: "Features must be outlines, markers or paths" });
+      return res.status(400).json({ error: "Features Must Be Outlines, Markers or Paths" });
     }
   }
 
@@ -464,7 +540,7 @@ router.put("/api/floor/:building/:floor", guard, (req, res) => {
     res.json({ ok: true, saved: path.basename(file), features: fc.features.length });
   } catch (err) {
     console.error("save floor failed:", err);
-    res.status(500).json({ error: "Could not write the floor file" });
+    res.status(500).json({ error: "Could Not Write the Floor File" });
   }
 });
 
@@ -491,7 +567,7 @@ router.put("/api/placement/:building/:floor", guard, (req, res) => {
     res.json({ ok: true });
   } catch (err) {
     console.error("save placement failed:", err);
-    res.status(500).json({ error: "Could not write the placement file" });
+    res.status(500).json({ error: "Could Not Write the Placement File" });
   }
 });
 
@@ -504,7 +580,6 @@ router.put("/api/placement/:building/:floor", guard, (req, res) => {
  * trace, save, rebuild, route.
  */
 router.post("/api/rebuild", guard, async (req, res) => {
-  const repo = path.join(__dirname, "..");
   const steps = [
     ["floorPlans/build_room_search_index.py",
       ["public/data/floor-coordinates", "public/data/room-search-index.json"]],
@@ -512,18 +587,9 @@ router.post("/api/rebuild", guard, async (req, res) => {
       ["public/data/floor-coordinates", "public/data/nav-graph.json"]],
   ];
 
-  const run = (script, args) => new Promise((resolve) => {
-    // "py" is the Windows launcher this project's other tooling uses; fall
-    // back to python3 so the same route works on a Linux host.
-    const exe = process.platform === "win32" ? "py" : "python3";
-    const argv = process.platform === "win32" ? ["-3", script, ...args] : [script, ...args];
-    execFile(exe, argv, { cwd: repo, timeout: 600000 }, (err, stdout, stderr) =>
-      resolve({ script, ok: !err, output: (stdout || "") + (stderr || "") }));
-  });
-
   const results = [];
   for (const [script, args] of steps) {
-    const r = await run(script, args);
+    const r = await runPython(script, args);
     results.push(r);
     if (!r.ok) break;
   }
@@ -552,6 +618,189 @@ router.post("/api/rebuild", guard, async (req, res) => {
     nodes: (nav.nodes || []).length,
     links: (nav.edges || []).length,
   });
+});
+
+// ---------------------------------------------------------------------------
+// The floor-plan library
+//
+// The sheets are BCIT's and BCIT keeps redrawing them, so getting a new one
+// into the app has to be something Facilities can do: drop the file in, and
+// the picture the tracer draws under the map is rebuilt from it.
+//
+// The work is in services/planLibrary.js. These are the doors to it.
+// ---------------------------------------------------------------------------
+
+/**
+ * The upload body is the file itself.
+ *
+ * A drawing is one file with two fields beside it, and those two fields are
+ * already in the URL -- so multipart would mean a parsing dependency for
+ * nothing. The body is the bytes; express.raw hands them over as a Buffer.
+ * application/octet-stream is accepted because that is what a browser calls
+ * a file it has no opinion about, and the bytes are sniffed anyway.
+ */
+const planUpload = express.raw({
+  type: ["application/pdf", "image/png", "application/octet-stream"],
+  limit: MAX_BYTES,
+});
+
+const who = (req) => req.session?.user?.email || req.session?.user?.uid || null;
+
+/** Answer a PlanError with the status it already knows it wants. */
+function planFailure(res, err) {
+  if (err instanceof PlanError) {
+    return res.status(err.status).json({ error: err.message, detail: err.detail });
+  }
+  console.error("plan library:", err);
+  return res.status(500).json({ error: "Something Went Wrong Handling That Sheet." });
+}
+
+router.get("/plans", guard, (req, res) => {
+  res.render("admin-plans", {
+    page: "plans",
+    title: "Wayfindr - Floor Plans",
+    user: req.session?.user,
+  });
+});
+
+/** Every sheet, and the recent replacements. */
+router.get("/api/library", guard, (req, res) => {
+  try {
+    res.json({
+      plans: listPlans(),
+      history: uploadHistory(),
+      maxBytes: MAX_BYTES,
+    });
+  } catch (err) {
+    planFailure(res, err);
+  }
+});
+
+/** The kept copies of one sheet, newest first. */
+router.get("/api/plan/:building/:floor/versions", guard, (req, res) => {
+  const stem = stemFor(req.params.building, req.params.floor);
+  if (!stem) return res.status(400).json({ error: "Bad Building or Floor" });
+  res.json({ stem, versions: versionsOf(stem) });
+});
+
+/**
+ * Which sheet each of these files is, going by its name.
+ *
+ * Asked of the server rather than worked out in the page, so that what counts
+ * as a sheet name is written down once. Thirty files dropped at once come
+ * back as thirty building-and-floor pairs, and whatever could not be read
+ * comes back as null for a person to fill in.
+ */
+router.post("/api/plan-names", guard, (req, res) => {
+  const names = req.body?.names;
+  if (!Array.isArray(names)) return res.status(400).json({ error: "Expected a List of File Names" });
+  res.json({
+    parsed: names.slice(0, 200).map((name) => ({
+      name: String(name),
+      match: parsePlanName(name),
+    })),
+  });
+});
+
+/**
+ * Replace one sheet.
+ *
+ * The old one is kept, the picture is re-rendered, and the position the plan
+ * had on the map is carried over when the two drawings agree about the page
+ * they came from. What is NOT touched is the tracing: the rooms drawn from
+ * the old sheet stay exactly where they were, because only a person can say
+ * which of them the new drawing has moved.
+ */
+router.post("/api/plan/:building/:floor", guard, planUpload, async (req, res) => {
+  if (!Buffer.isBuffer(req.body) || !req.body.length) {
+    return res.status(415).json({
+      error: "Send the File Itself as the Body, with a PDF or PNG Content Type.",
+    });
+  }
+  try {
+    const report = await replacePlan({
+      building: req.params.building,
+      floor: req.params.floor,
+      bytes: req.body,
+      filename: String(req.query.name || ""),
+      by: who(req),
+    });
+    res.json(report);
+  } catch (err) {
+    planFailure(res, err);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Who maintains the map
+//
+// The list of administrators has to be changeable by the administrators
+// themselves, or the only way to appoint the next one is a developer with a
+// deployment -- which is fine on the day the app is built and hopeless a year
+// later when the person who set it up has left.
+//
+// The work is in services/userAdmin.js.
+// ---------------------------------------------------------------------------
+
+router.get("/users", guard, (req, res) => {
+  res.render("admin-users", {
+    page: "users",
+    title: "Wayfindr - People",
+    user: req.session?.user,
+  });
+});
+
+function userFailure(res, err) {
+  if (err instanceof UserAdminError) {
+    return res.status(err.status).json({ error: err.message });
+  }
+  console.error("user admin:", err);
+  return res.status(500).json({ error: "Something Went Wrong Reading the Accounts." });
+}
+
+/** Everybody with an account, and which of them maintain the map. */
+router.get("/api/users", guard, async (req, res) => {
+  try {
+    const data = await listUsers();
+    // so the page can mark the row that is you, and refuse to offer you a
+    // button that would lock you out
+    res.json({ ...data, you: req.session?.user?.uid || null });
+  } catch (err) {
+    userFailure(res, err);
+  }
+});
+
+/**
+ * Make somebody an administrator, or stop them being one.
+ *
+ * Only an administrator can reach this -- the whole router is behind that --
+ * so the check that matters here is the one about not being able to do it to
+ * yourself.
+ */
+router.post("/api/users/:uid/admin", guard, async (req, res) => {
+  try {
+    const result = await setAdmin(req.params.uid, req.body?.admin === true, {
+      by: req.session?.user?.uid || null,
+    });
+    res.json(result);
+  } catch (err) {
+    userFailure(res, err);
+  }
+});
+
+/** Put a kept copy back in place of the current one. */
+router.post("/api/plan/:building/:floor/restore", guard, async (req, res) => {
+  try {
+    const report = await restoreVersion({
+      building: req.params.building,
+      floor: req.params.floor,
+      file: req.body?.file,
+      by: who(req),
+    });
+    res.json(report);
+  } catch (err) {
+    planFailure(res, err);
+  }
 });
 
 export default router;

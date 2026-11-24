@@ -1,0 +1,1340 @@
+{
+ "CARI": {
+  "anchor": "CARI-Floor2",
+  "iou": 0.5437,
+  "ratio": 600,
+  "snapped": true,
+  "rotation": 0.0,
+  "runnerUpIou": 0.5929,
+  "ambiguousAngle": true,
+  "northUsed": 0.0,
+  "placements": {
+   "CARI-Floor1": {
+    "lng": -123.00428324644,
+    "lat": 49.24616543846555,
+    "widthM": 249.48444444444442,
+    "rotation": 0.0
+   },
+   "CARI-Floor2": {
+    "lng": -123.00425068216003,
+    "lat": 49.24616385216436,
+    "widthM": 249.55499999999998,
+    "rotation": 0.0
+   }
+  },
+  "notes": {
+   "CARI-Floor1": {
+    "coverage": 0.537,
+    "ownIou": 0.594,
+    "ownRatio": 500
+   },
+   "CARI-Floor2": {
+    "coverage": 0.694,
+    "ownIou": 0.595,
+    "ownRatio": 600
+   }
+  }
+ },
+ "NE1": {
+  "anchor": "NE1-Floor2",
+  "iou": 0.9511,
+  "ratio": 300,
+  "snapped": true,
+  "rotation": 270.0,
+  "runnerUpIou": 0.9693,
+  "ambiguousAngle": true,
+  "northUsed": null,
+  "placements": {
+   "NE1-Floor1": {
+    "lng": -123.00101080188973,
+    "lat": 49.25407300144801,
+    "widthM": 81.73861111111111,
+    "rotation": 270.0
+   },
+   "NE1-Floor2": {
+    "lng": -123.00101104490675,
+    "lat": 49.25407284281789,
+    "widthM": 81.77388888888889,
+    "rotation": 270.0
+   },
+   "NE1-Floor3": {
+    "lng": -123.00101104490675,
+    "lat": 49.25407284281789,
+    "widthM": 81.77388888888889,
+    "rotation": 270.0
+   },
+   "NE1-Floor4": {
+    "lng": -123.00101104490675,
+    "lat": 49.25407284281789,
+    "widthM": 81.91499999999999,
+    "rotation": 270.0
+   }
+  },
+  "notes": {
+   "NE1-Floor1": {
+    "coverage": 0.923,
+    "ownIou": 0.959,
+    "ownRatio": 300
+   },
+   "NE1-Floor2": {
+    "coverage": 0.978,
+    "ownIou": 0.951,
+    "ownRatio": 300
+   },
+   "NE1-Floor3": {
+    "coverage": 0.982,
+    "ownIou": 0.948,
+    "ownRatio": 300
+   },
+   "NE1-Floor4": {
+    "coverage": 0.982,
+    "ownIou": 0.95,
+    "ownRatio": 300
+   }
+  }
+ },
+ "NE10": {
+  "anchor": "NE10-Floor1",
+  "iou": 0.957,
+  "ratio": 225,
+  "snapped": true,
+  "rotation": 270.0,
+  "runnerUpIou": 0.882,
+  "ambiguousAngle": false,
+  "northUsed": null,
+  "placements": {
+   "NE10-Floor1": {
+    "lng": -122.99855515197855,
+    "lat": 49.2532580147367,
+    "widthM": 90.72562500000001,
+    "rotation": 270.0
+   }
+  },
+  "notes": {
+   "NE10-Floor1": {
+    "coverage": 0.993,
+    "ownIou": 0.957,
+    "ownRatio": 225
+   }
+  }
+ },
+ "NE12": {
+  "anchor": "NE12-Floor2",
+  "iou": 0.8593,
+  "ratio": 300,
+  "snapped": true,
+  "rotation": 270.0,
+  "runnerUpIou": 0.8907,
+  "ambiguousAngle": true,
+  "northUsed": null,
+  "placements": {
+   "NE12-Floor1": {
+    "lng": -122.99868283926558,
+    "lat": 49.25277144011554,
+    "widthM": 120.96749999999999,
+    "rotation": 270.0
+   },
+   "NE12-Floor2": {
+    "lng": -122.99868283926558,
+    "lat": 49.25276271545896,
+    "widthM": 129.54,
+    "rotation": 270.0
+   }
+  },
+  "notes": {
+   "NE12-Floor1": {
+    "coverage": 0.648,
+    "ownIou": 0.7,
+    "ownRatio": 300
+   },
+   "NE12-Floor2": {
+    "coverage": 0.869,
+    "ownIou": 0.859,
+    "ownRatio": 300
+   }
+  }
+ },
+ "NE16": {
+  "anchor": "NE16-Floor1",
+  "iou": 0.8932,
+  "ratio": 225,
+  "snapped": true,
+  "rotation": 270.0,
+  "runnerUpIou": 0.8829,
+  "ambiguousAngle": true,
+  "northUsed": null,
+  "placements": {
+   "NE16-Floor1": {
+    "lng": -122.99984846333285,
+    "lat": 49.25202048482721,
+    "widthM": 57.864375,
+    "rotation": 270.0
+   }
+  },
+  "notes": {
+   "NE16-Floor1": {
+    "coverage": 0.915,
+    "ownIou": 0.893,
+    "ownRatio": 225
+   }
+  }
+ },
+ "NE18": {
+  "anchor": "NE18-Floor1",
+  "iou": 0.7969,
+  "ratio": 225,
+  "snapped": true,
+  "rotation": 270.0,
+  "runnerUpIou": 0.851,
+  "ambiguousAngle": true,
+  "northUsed": null,
+  "placements": {
+   "NE18-Floor1": {
+    "lng": -123.00065439757337,
+    "lat": 49.25204280327748,
+    "widthM": 90.805,
+    "rotation": 270.0
+   }
+  },
+  "notes": {
+   "NE18-Floor1": {
+    "coverage": 0.836,
+    "ownIou": 0.797,
+    "ownRatio": 225
+   }
+  }
+ },
+ "NE2": {
+  "anchor": "NE2-Floor1",
+  "iou": 0.8573,
+  "ratio": 200,
+  "snapped": true,
+  "rotation": 0.0,
+  "runnerUpIou": 0.8492,
+  "ambiguousAngle": true,
+  "northUsed": null,
+  "placements": {
+   "NE2-Floor1": {
+    "lng": -123.00178747738997,
+    "lat": 49.25333697917446,
+    "widthM": 83.27907407407407,
+    "rotation": 0.0
+   },
+   "NE2-Floor2": {
+    "lng": -123.00178731537862,
+    "lat": 49.25333697917446,
+    "widthM": 83.20851851851852,
+    "rotation": 0.0
+   }
+  },
+  "notes": {
+   "NE2-Floor1": {
+    "coverage": 0.916,
+    "ownIou": 0.857,
+    "ownRatio": 200
+   },
+   "NE2-Floor2": {
+    "coverage": 0.469,
+    "ownIou": 0.161,
+    "ownRatio": 425.3
+   }
+  }
+ },
+ "NE20": {
+  "anchor": "NE20-Floor1",
+  "iou": 0.8063,
+  "ratio": 300,
+  "snapped": true,
+  "rotation": 270.0,
+  "runnerUpIou": 0.793,
+  "ambiguousAngle": true,
+  "northUsed": null,
+  "placements": {
+   "NE20-Floor1": {
+    "lng": -123.00154307918996,
+    "lat": 49.25206472199189,
+    "widthM": 124.77749999999999,
+    "rotation": 270.0
+   },
+   "NE20-Floor2": {
+    "lng": -123.00155571607472,
+    "lat": 49.252072812128,
+    "widthM": 121.07333333333332,
+    "rotation": 270.0
+   }
+  },
+  "notes": {
+   "NE20-Floor1": {
+    "coverage": 0.897,
+    "ownIou": 0.806,
+    "ownRatio": 300
+   },
+   "NE20-Floor2": {
+    "coverage": 0.432,
+    "ownIou": 0.637,
+    "ownRatio": 175
+   }
+  }
+ },
+ "NE22": {
+  "anchor": "NE22-Floor1",
+  "iou": 0.9059,
+  "ratio": 100,
+  "snapped": true,
+  "rotation": 90.0,
+  "runnerUpIou": 0.9747,
+  "ambiguousAngle": true,
+  "northUsed": null,
+  "placements": {
+   "NE22-Floor1": {
+    "lng": -123.0016331645365,
+    "lat": 49.252479956981645,
+    "widthM": 26.3525,
+    "rotation": 90.0
+   }
+  },
+  "notes": {
+   "NE22-Floor1": {
+    "coverage": 0.912,
+    "ownIou": 0.906,
+    "ownRatio": 100
+   }
+  }
+ },
+ "NE23": {
+  "anchor": "NE23-Floor1",
+  "iou": 0.8063,
+  "ratio": 175,
+  "snapped": true,
+  "rotation": 270.0,
+  "runnerUpIou": 0.8111,
+  "ambiguousAngle": true,
+  "northUsed": null,
+  "placements": {
+   "NE23-Floor1": {
+    "lng": -123.00107513213932,
+    "lat": 49.252886561458645,
+    "widthM": 70.58495370370369,
+    "rotation": 270.0
+   }
+  },
+  "notes": {
+   "NE23-Floor1": {
+    "coverage": 0.897,
+    "ownIou": 0.806,
+    "ownRatio": 175
+   }
+  }
+ },
+ "NE24": {
+  "anchor": "NE24-Floor1",
+  "iou": 0.8114,
+  "ratio": 175,
+  "snapped": true,
+  "rotation": 270.0,
+  "runnerUpIou": 0.8218,
+  "ambiguousAngle": true,
+  "northUsed": null,
+  "placements": {
+   "NE24-Floor1": {
+    "lng": -123.00111745097875,
+    "lat": 49.25244965339942,
+    "widthM": 70.6261111111111,
+    "rotation": 270.0
+   }
+  },
+  "notes": {
+   "NE24-Floor1": {
+    "coverage": 0.901,
+    "ownIou": 0.811,
+    "ownRatio": 175
+   }
+  }
+ },
+ "NE25": {
+  "anchor": "NE25-Floor2",
+  "iou": 0.895,
+  "ratio": 200,
+  "snapped": true,
+  "rotation": 0.0,
+  "runnerUpIou": 0.8789,
+  "ambiguousAngle": true,
+  "northUsed": null,
+  "placements": {
+   "NE25-Floor1": {
+    "lng": -123.00043613374453,
+    "lat": 49.25290398317013,
+    "widthM": 83.20851851851852,
+    "rotation": 0.0
+   },
+   "NE25-Floor2": {
+    "lng": -123.00043629575588,
+    "lat": 49.25290398317013,
+    "widthM": 83.27907407407407,
+    "rotation": 0.0
+   },
+   "NE25-Floor3": {
+    "lng": -123.00043629575588,
+    "lat": 49.25290387741671,
+    "widthM": 83.185,
+    "rotation": 0.0
+   }
+  },
+  "notes": {
+   "NE25-Floor1": {
+    "coverage": 0.919,
+    "ownIou": 0.879,
+    "ownRatio": 200
+   },
+   "NE25-Floor2": {
+    "coverage": 0.937,
+    "ownIou": 0.895,
+    "ownRatio": 200
+   },
+   "NE25-Floor3": {
+    "coverage": 0.939,
+    "ownIou": 0.883,
+    "ownRatio": 200
+   }
+  }
+ },
+ "NE28": {
+  "anchor": "NE28-Floor1",
+  "iou": 0.9782,
+  "ratio": 125,
+  "snapped": true,
+  "rotation": 270.0,
+  "runnerUpIou": 0.961,
+  "ambiguousAngle": true,
+  "northUsed": null,
+  "placements": {
+   "NE28-Floor1": {
+    "lng": -122.99993890027413,
+    "lat": 49.25244139751006,
+    "widthM": 32.11747685185185,
+    "rotation": 270.0
+   }
+  },
+  "notes": {
+   "NE28-Floor1": {
+    "coverage": 0.925,
+    "ownIou": 0.978,
+    "ownRatio": 125
+   }
+  }
+ },
+ "NE3": {
+  "anchor": "NE3-Floor1",
+  "iou": 0.304,
+  "ratio": 125,
+  "snapped": true,
+  "rotation": 0.0,
+  "runnerUpIou": 0.6282,
+  "ambiguousAngle": true,
+  "northUsed": null,
+  "placements": {
+   "NE3-Floor1": {
+    "lng": -122.99994385743204,
+    "lat": 49.253848043705695,
+    "widthM": 51.990624999999994,
+    "rotation": 0.0
+   },
+   "NE3-Floor2": {
+    "lng": -122.99995995730926,
+    "lat": 49.25384467281565,
+    "widthM": 50.447222222222216,
+    "rotation": 0.0
+   }
+  },
+  "notes": {
+   "NE3-Floor1": {
+    "coverage": 0.969,
+    "ownIou": 0.304,
+    "ownRatio": 125
+   },
+   "NE3-Floor2": {
+    "coverage": 0.034,
+    "ownIou": 0.215,
+    "ownRatio": 125
+   }
+  }
+ },
+ "NE4": {
+  "anchor": "NE4-Floor1",
+  "iou": 0.867,
+  "ratio": 300,
+  "snapped": true,
+  "rotation": 180.0,
+  "runnerUpIou": 0.8614,
+  "ambiguousAngle": true,
+  "northUsed": null,
+  "placements": {
+   "NE4-Floor1": {
+    "lng": -123.00084058009055,
+    "lat": 49.253296140545686,
+    "widthM": 124.77749999999999,
+    "rotation": 180.0
+   },
+   "NE4-Floor2": {
+    "lng": -123.00084082310757,
+    "lat": 49.253296140545686,
+    "widthM": 124.81277777777777,
+    "rotation": 180.0
+   }
+  },
+  "notes": {
+   "NE4-Floor1": {
+    "coverage": 0.91,
+    "ownIou": 0.867,
+    "ownRatio": 300
+   },
+   "NE4-Floor2": {
+    "coverage": 0.857,
+    "ownIou": 0.256,
+    "ownRatio": 500
+   }
+  }
+ },
+ "NE6": {
+  "anchor": "NE6-Floor2",
+  "iou": 0.9103,
+  "ratio": 200,
+  "snapped": true,
+  "rotation": 270.0,
+  "runnerUpIou": 0.9014,
+  "ambiguousAngle": true,
+  "northUsed": null,
+  "placements": {
+   "NE6-Floor1": {
+    "lng": -122.99982957007286,
+    "lat": 49.253313216028296,
+    "widthM": 83.185,
+    "rotation": 270.0
+   },
+   "NE6-Floor2": {
+    "lng": -122.99982957007286,
+    "lat": 49.253313216028296,
+    "widthM": 83.185,
+    "rotation": 270.0
+   }
+  },
+  "notes": {
+   "NE6-Floor1": {
+    "coverage": 0.838,
+    "ownIou": 0.836,
+    "ownRatio": 200
+   },
+   "NE6-Floor2": {
+    "coverage": 0.999,
+    "ownIou": 0.91,
+    "ownRatio": 200
+   }
+  }
+ },
+ "NE7": {
+  "anchor": "NE7-Floor1",
+  "iou": 0.8871,
+  "ratio": 150,
+  "snapped": true,
+  "rotation": 270.0,
+  "runnerUpIou": 0.9048,
+  "ambiguousAngle": true,
+  "northUsed": null,
+  "placements": {
+   "NE7-Floor1": {
+    "lng": -122.99864575871158,
+    "lat": 49.25362690560333,
+    "widthM": 38.576249999999995,
+    "rotation": 270.0
+   }
+  },
+  "notes": {
+   "NE7-Floor1": {
+    "coverage": 0.991,
+    "ownIou": 0.887,
+    "ownRatio": 150
+   }
+  }
+ },
+ "NE8": {
+  "anchor": "NE8-Floor2",
+  "iou": 0.8531,
+  "ratio": 200,
+  "snapped": true,
+  "rotation": 270.0,
+  "runnerUpIou": 0.9258,
+  "ambiguousAngle": true,
+  "northUsed": null,
+  "placements": {
+   "NE8-Floor1": {
+    "lng": -122.99930307186428,
+    "lat": 49.25328010796893,
+    "widthM": 80.645,
+    "rotation": 270.0
+   },
+   "NE8-Floor2": {
+    "lng": -122.99931149645411,
+    "lat": 49.253285501393,
+    "widthM": 80.71555555555555,
+    "rotation": 270.0
+   }
+  },
+  "notes": {
+   "NE8-Floor1": {
+    "coverage": 0.762,
+    "ownIou": 0.764,
+    "ownRatio": 200
+   },
+   "NE8-Floor2": {
+    "coverage": 0.88,
+    "ownIou": 0.853,
+    "ownRatio": 200
+   }
+  }
+ },
+ "NE9": {
+  "anchor": "NE9-Floor2",
+  "iou": 0.9104,
+  "ratio": 225,
+  "snapped": true,
+  "rotation": 270.0,
+  "runnerUpIou": 0.653,
+  "ambiguousAngle": false,
+  "northUsed": null,
+  "placements": {
+   "NE9-Floor1": {
+    "lng": -122.99866930750966,
+    "lat": 49.25407172801121,
+    "widthM": 90.75208333333333,
+    "rotation": 270.0
+   },
+   "NE9-Floor2": {
+    "lng": -122.99866930750966,
+    "lat": 49.25407172801121,
+    "widthM": 90.75208333333333,
+    "rotation": 270.0
+   }
+  },
+  "notes": {
+   "NE9-Floor1": {
+    "coverage": 0.862,
+    "ownIou": 0.852,
+    "ownRatio": 250
+   },
+   "NE9-Floor2": {
+    "coverage": 0.952,
+    "ownIou": 0.91,
+    "ownRatio": 225
+   }
+  }
+ },
+ "NW1": {
+  "anchor": "NW1-Floor1",
+  "iou": 0.7692,
+  "ratio": 200,
+  "snapped": true,
+  "rotation": 270.0,
+  "runnerUpIou": 0.6184,
+  "ambiguousAngle": false,
+  "northUsed": null,
+  "placements": {
+   "NW1-Floor1": {
+    "lng": -123.00338990699004,
+    "lat": 49.25276593568898,
+    "widthM": 83.27907407407407,
+    "rotation": 270.0
+   }
+  },
+  "notes": {
+   "NW1-Floor1": {
+    "coverage": 0.978,
+    "ownIou": 0.769,
+    "ownRatio": 200
+   }
+  }
+ },
+ "NW3": {
+  "anchor": "NW3-Floor1",
+  "iou": 0.7327,
+  "ratio": 300,
+  "snapped": true,
+  "rotation": 0.0,
+  "runnerUpIou": 0.6758,
+  "ambiguousAngle": false,
+  "northUsed": null,
+  "placements": {
+   "NW3-Floor1": {
+    "lng": -123.00259891827916,
+    "lat": 49.253392977779505,
+    "widthM": 81.91499999999999,
+    "rotation": 0.0
+   },
+   "NW3-Floor2": {
+    "lng": -123.00229733416403,
+    "lat": 49.25359015501831,
+    "widthM": 121.03805555555554,
+    "rotation": 0.0
+   }
+  },
+  "notes": {
+   "NW3-Floor1": {
+    "coverage": 0.921,
+    "ownIou": 0.733,
+    "ownRatio": 300
+   },
+   "NW3-Floor2": {
+    "coverage": 0.219,
+    "ownIou": 0.716,
+    "ownRatio": 200
+   }
+  }
+ },
+ "NW4": {
+  "anchor": "NW4-Floor2",
+  "iou": 0.9444,
+  "ratio": 250,
+  "snapped": true,
+  "rotation": 0.0,
+  "runnerUpIou": 0.9077,
+  "ambiguousAngle": true,
+  "northUsed": null,
+  "placements": {
+   "NW4-Floor1": {
+    "lng": -123.00333363211955,
+    "lat": 49.25212743267224,
+    "widthM": 69.85,
+    "rotation": 0.0
+   },
+   "NW4-Floor2": {
+    "lng": -123.00333363211955,
+    "lat": 49.25212743267224,
+    "widthM": 69.85,
+    "rotation": 0.0
+   },
+   "NW4-Floor3": {
+    "lng": -123.00333363211955,
+    "lat": 49.25212743267224,
+    "widthM": 68.08611111111111,
+    "rotation": 0.0
+   },
+   "NW4-Floor4": {
+    "lng": -123.00333363211955,
+    "lat": 49.25212743267224,
+    "widthM": 68.08611111111111,
+    "rotation": 0.0
+   }
+  },
+  "notes": {
+   "NW4-Floor1": {
+    "coverage": 0.953,
+    "ownIou": 0.882,
+    "ownRatio": 267.0
+   },
+   "NW4-Floor2": {
+    "coverage": 0.974,
+    "ownIou": 0.944,
+    "ownRatio": 250
+   },
+   "NW4-Floor3": {
+    "coverage": 0.613,
+    "ownIou": 0.761,
+    "ownRatio": 200
+   },
+   "NW4-Floor4": {
+    "coverage": 0.937,
+    "ownIou": 0.918,
+    "ownRatio": 250
+   }
+  }
+ },
+ "NW5": {
+  "anchor": "NW5-Floor2",
+  "iou": 0.6971,
+  "ratio": 75,
+  "snapped": true,
+  "rotation": 0.0,
+  "runnerUpIou": 0.8656,
+  "ambiguousAngle": true,
+  "northUsed": null,
+  "placements": {
+   "NW5-Floor1": {
+    "lng": -123.00240202544127,
+    "lat": 49.25254770075289,
+    "widthM": 30.277152777777776,
+    "rotation": 0.0
+   },
+   "NW5-Floor2": {
+    "lng": -123.00239874471157,
+    "lat": 49.25254770075289,
+    "widthM": 30.277152777777776,
+    "rotation": 0.0
+   }
+  },
+  "notes": {
+   "NW5-Floor1": {
+    "coverage": 0.978,
+    "ownIou": 0.615,
+    "ownRatio": 75
+   },
+   "NW5-Floor2": {
+    "coverage": 0.999,
+    "ownIou": 0.697,
+    "ownRatio": 75
+   }
+  }
+ },
+ "NW6": {
+  "anchor": "NW6-Floor1",
+  "iou": 0.9811,
+  "ratio": 200,
+  "snapped": true,
+  "rotation": 90.0,
+  "runnerUpIou": 0.9568,
+  "ambiguousAngle": true,
+  "northUsed": null,
+  "placements": {
+   "NW6-Floor1": {
+    "lng": -123.00238488444256,
+    "lat": 49.252111464934984,
+    "widthM": 80.73907407407407,
+    "rotation": 90.0
+   },
+   "NW6-Floor2": {
+    "lng": -123.00238488444256,
+    "lat": 49.252111464934984,
+    "widthM": 80.73907407407407,
+    "rotation": 90.0
+   }
+  },
+  "notes": {
+   "NW6-Floor1": {
+    "coverage": 0.999,
+    "ownIou": 0.981,
+    "ownRatio": 200
+   },
+   "NW6-Floor2": {
+    "coverage": 0.997,
+    "ownIou": 0.916,
+    "ownRatio": 200
+   }
+  }
+ },
+ "SE1": {
+  "anchor": "SE1-Floor1",
+  "iou": 0.6052,
+  "ratio": 400,
+  "snapped": true,
+  "rotation": 270.0,
+  "runnerUpIou": 0.6053,
+  "ambiguousAngle": true,
+  "northUsed": null,
+  "placements": {
+   "SE1-Floor1": {
+    "lng": -122.999297546021,
+    "lat": 49.251172604681926,
+    "widthM": 169.99185185185186,
+    "rotation": 270.0
+   },
+   "SE1-Floor2": {
+    "lng": -122.9992972219983,
+    "lat": 49.251172816188756,
+    "widthM": 170.0388888888889,
+    "rotation": 270.0
+   }
+  },
+  "notes": {
+   "SE1-Floor1": {
+    "coverage": 0.756,
+    "ownIou": 0.605,
+    "ownRatio": 400
+   },
+   "SE1-Floor2": {
+    "coverage": 0.618,
+    "ownIou": 0.594,
+    "ownRatio": 350
+   }
+  }
+ },
+ "SE10": {
+  "anchor": "SE10-Floor1",
+  "iou": 0.6505,
+  "ratio": 225,
+  "snapped": true,
+  "rotation": 270.0,
+  "runnerUpIou": 0.6496,
+  "ambiguousAngle": true,
+  "northUsed": 270.0,
+  "placements": {
+   "SE10-Floor1": {
+    "lng": -123.00076056255686,
+    "lat": 49.24988933145332,
+    "widthM": 57.864375,
+    "rotation": 270.0
+   },
+   "SE10-Floor2": {
+    "lng": -123.00075053810501,
+    "lat": 49.2498953990554,
+    "widthM": 57.94375,
+    "rotation": 270.0
+   }
+  },
+  "notes": {
+   "SE10-Floor1": {
+    "coverage": 0.782,
+    "ownIou": 0.651,
+    "ownRatio": 225
+   },
+   "SE10-Floor2": {
+    "coverage": 0.77,
+    "ownIou": 0.64,
+    "ownRatio": 225
+   }
+  }
+ },
+ "SE14": {
+  "anchor": "SE14-Floor3",
+  "iou": 0.7105,
+  "ratio": 300,
+  "snapped": true,
+  "rotation": 0.0,
+  "runnerUpIou": 0.6703,
+  "ambiguousAngle": true,
+  "northUsed": null,
+  "placements": {
+   "SE14-Floor1": {
+    "lng": -123.00082668902813,
+    "lat": 49.24947528428881,
+    "widthM": 128.48166666666665,
+    "rotation": 0.0
+   },
+   "SE14-Floor2": {
+    "lng": -123.00081380912636,
+    "lat": 49.24947512565869,
+    "widthM": 124.77749999999999,
+    "rotation": 0.0
+   },
+   "SE14-Floor3": {
+    "lng": -123.00081380912636,
+    "lat": 49.24947512565869,
+    "widthM": 124.77749999999999,
+    "rotation": 0.0
+   }
+  },
+  "notes": {
+   "SE14-Floor1": {
+    "coverage": 0.831,
+    "ownIou": 0.698,
+    "ownRatio": 300
+   },
+   "SE14-Floor2": {
+    "coverage": 0.785,
+    "ownIou": 0.689,
+    "ownRatio": 300
+   },
+   "SE14-Floor3": {
+    "coverage": 0.841,
+    "ownIou": 0.71,
+    "ownRatio": 300
+   }
+  }
+ },
+ "SE16": {
+  "anchor": "SE16-Floor1",
+  "iou": 0.7272,
+  "ratio": 350,
+  "snapped": true,
+  "rotation": 270.0,
+  "runnerUpIou": 0.6426,
+  "ambiguousAngle": false,
+  "northUsed": null,
+  "placements": {
+   "SE16-Floor1": {
+    "lng": -123.00088377604186,
+    "lat": 49.24879502587696,
+    "widthM": 92.39837962962962,
+    "rotation": 270.0
+   }
+  },
+  "notes": {
+   "SE16-Floor1": {
+    "coverage": 0.868,
+    "ownIou": 0.727,
+    "ownRatio": 350
+   }
+  }
+ },
+ "SE30": {
+  "anchor": "SE30-Floor1",
+  "iou": 0.8337,
+  "ratio": 150,
+  "snapped": true,
+  "rotation": 90.0,
+  "runnerUpIou": 0.9192,
+  "ambiguousAngle": true,
+  "northUsed": null,
+  "placements": {
+   "SE30-Floor1": {
+    "lng": -122.9987183932523,
+    "lat": 49.24632436930094,
+    "widthM": 60.51902777777777,
+    "rotation": 90.0
+   }
+  },
+  "notes": {
+   "SE30-Floor1": {
+    "coverage": 0.999,
+    "ownIou": 0.834,
+    "ownRatio": 150
+   }
+  }
+ },
+ "SE4": {
+  "anchor": "SE4-Floor1",
+  "iou": 0.78,
+  "ratio": 175,
+  "snapped": true,
+  "rotation": 270.0,
+  "runnerUpIou": 0.6439,
+  "ambiguousAngle": false,
+  "northUsed": null,
+  "placements": {
+   "SE4-Floor1": {
+    "lng": -123.00015799027808,
+    "lat": 49.25131302679963,
+    "widthM": 70.58495370370369,
+    "rotation": 270.0
+   }
+  },
+  "notes": {
+   "SE4-Floor1": {
+    "coverage": 0.837,
+    "ownIou": 0.78,
+    "ownRatio": 175
+   }
+  }
+ },
+ "SE40": {
+  "anchor": "SE40-Floor2",
+  "iou": 0.8777,
+  "ratio": 100,
+  "snapped": true,
+  "rotation": 0.0,
+  "runnerUpIou": 0.8309,
+  "ambiguousAngle": true,
+  "northUsed": null,
+  "placements": {
+   "SE40-Floor1": {
+    "lng": -122.99880481300218,
+    "lat": 49.243434584431846,
+    "widthM": 41.5925,
+    "rotation": 0.0
+   },
+   "SE40-Floor2": {
+    "lng": -122.99880481300218,
+    "lat": 49.243434584431846,
+    "widthM": 41.63953703703704,
+    "rotation": 0.0
+   }
+  },
+  "notes": {
+   "SE40-Floor1": {
+    "coverage": 1.0,
+    "ownIou": 0.854,
+    "ownRatio": 100
+   },
+   "SE40-Floor2": {
+    "coverage": 1.0,
+    "ownIou": 0.878,
+    "ownRatio": 100
+   }
+  }
+ },
+ "SE41": {
+  "anchor": "SE41-Floor2",
+  "iou": 0.8849,
+  "ratio": 150,
+  "snapped": true,
+  "rotation": 270.0,
+  "runnerUpIou": 0.8935,
+  "ambiguousAngle": true,
+  "northUsed": null,
+  "placements": {
+   "SE41-Floor1": {
+    "lng": -122.99943272050768,
+    "lat": 49.243748764521925,
+    "widthM": 40.25194444444444,
+    "rotation": 270.0
+   },
+   "SE41-Floor2": {
+    "lng": -122.999421298708,
+    "lat": 49.243748764521925,
+    "widthM": 40.25194444444444,
+    "rotation": 270.0
+   }
+  },
+  "notes": {
+   "SE41-Floor1": {
+    "coverage": 0.611,
+    "ownIou": 0.742,
+    "ownRatio": 132.6
+   },
+   "SE41-Floor2": {
+    "coverage": 0.988,
+    "ownIou": 0.885,
+    "ownRatio": 150
+   }
+  }
+ },
+ "SE42": {
+  "anchor": "SE42-Floor2",
+  "iou": 0.8506,
+  "ratio": 200,
+  "snapped": true,
+  "rotation": 180.0,
+  "runnerUpIou": 0.3955,
+  "ambiguousAngle": false,
+  "northUsed": null,
+  "placements": {
+   "SE42-Floor1": {
+    "lng": -122.99946240071255,
+    "lat": 49.24337772532299,
+    "widthM": 80.66851851851852,
+    "rotation": 180.0
+   },
+   "SE42-Floor2": {
+    "lng": -122.99945365210002,
+    "lat": 49.24337783107641,
+    "widthM": 80.66851851851852,
+    "rotation": 180.0
+   }
+  },
+  "notes": {
+   "SE42-Floor1": {
+    "coverage": 0.987,
+    "ownIou": 0.857,
+    "ownRatio": 225
+   },
+   "SE42-Floor2": {
+    "coverage": 0.955,
+    "ownIou": 0.851,
+    "ownRatio": 200
+   }
+  }
+ },
+ "SE50": {
+  "anchor": "SE50-Floor1",
+  "iou": 0.8254,
+  "ratio": 250,
+  "snapped": true,
+  "rotation": 90.0,
+  "runnerUpIou": 0.6866,
+  "ambiguousAngle": false,
+  "northUsed": null,
+  "placements": {
+   "SE50-Floor1": {
+    "lng": -122.99894888271147,
+    "lat": 49.24267439403035,
+    "widthM": 100.80624999999999,
+    "rotation": 90.0
+   }
+  },
+  "notes": {
+   "SE50-Floor1": {
+    "coverage": 0.939,
+    "ownIou": 0.825,
+    "ownRatio": 250
+   }
+  }
+ },
+ "SE6": {
+  "anchor": "SE6-Floor2",
+  "iou": 0.8471,
+  "ratio": 270.4,
+  "snapped": false,
+  "rotation": 270.0,
+  "runnerUpIou": 0.7812,
+  "ambiguousAngle": false,
+  "northUsed": null,
+  "placements": {
+   "SE6-Floor1": {
+    "lng": -123.00052857664343,
+    "lat": 49.25089854778345,
+    "widthM": 69.54004309798741,
+    "rotation": 270.0
+   },
+   "SE6-Floor2": {
+    "lng": -123.00052857664343,
+    "lat": 49.25089854778345,
+    "widthM": 69.54004309798741,
+    "rotation": 270.0
+   },
+   "SE6-Floor3": {
+    "lng": -123.00051631045419,
+    "lat": 49.25090583968473,
+    "widthM": 69.63543410360879,
+    "rotation": 270.0
+   }
+  },
+  "notes": {
+   "SE6-Floor1": {
+    "coverage": 0.84,
+    "ownIou": 0.804,
+    "ownRatio": 300
+   },
+   "SE6-Floor2": {
+    "coverage": 0.899,
+    "ownIou": 0.847,
+    "ownRatio": 270.4
+   },
+   "SE6-Floor3": {
+    "coverage": 0.762,
+    "ownIou": 0.804,
+    "ownRatio": 250
+   }
+  }
+ },
+ "SE8": {
+  "anchor": "SE8-Floor2",
+  "iou": 0.9328,
+  "ratio": 200,
+  "snapped": true,
+  "rotation": 90.0,
+  "runnerUpIou": 0.787,
+  "ambiguousAngle": false,
+  "northUsed": null,
+  "placements": {
+   "SE8-Floor1": {
+    "lng": -123.0014145983411,
+    "lat": 49.25077138255625,
+    "widthM": 81.5151851851852,
+    "rotation": 90.0
+   },
+   "SE8-Floor2": {
+    "lng": -123.00141378828438,
+    "lat": 49.250788726116006,
+    "widthM": 83.16148148148149,
+    "rotation": 90.0
+   }
+  },
+  "notes": {
+   "SE8-Floor1": {
+    "coverage": 0.872,
+    "ownIou": 0.871,
+    "ownRatio": 200
+   },
+   "SE8-Floor2": {
+    "coverage": 0.976,
+    "ownIou": 0.933,
+    "ownRatio": 200
+   }
+  }
+ },
+ "SE9": {
+  "anchor": "SE9-Floor1",
+  "iou": 0.8904,
+  "ratio": 75,
+  "snapped": true,
+  "rotation": 270.0,
+  "runnerUpIou": 0.8452,
+  "ambiguousAngle": true,
+  "northUsed": null,
+  "placements": {
+   "SE9-Floor1": {
+    "lng": -123.00133882452869,
+    "lat": 49.250405487295986,
+    "widthM": 30.241874999999997,
+    "rotation": 270.0
+   }
+  },
+  "notes": {
+   "SE9-Floor1": {
+    "coverage": 0.863,
+    "ownIou": 0.89,
+    "ownRatio": 75
+   }
+  }
+ },
+ "SW2": {
+  "anchor": "SW2-Floor3",
+  "iou": 0.8058,
+  "ratio": 200,
+  "snapped": true,
+  "rotation": 270.0,
+  "runnerUpIou": 0.7192,
+  "ambiguousAngle": false,
+  "northUsed": null,
+  "placements": {
+   "SW2-Floor1": {
+    "lng": -123.00335461952656,
+    "lat": 49.250348203633855,
+    "widthM": 80.73907407407407,
+    "rotation": 270.0
+   },
+   "SW2-Floor2": {
+    "lng": -123.00335478153791,
+    "lat": 49.250348203633855,
+    "widthM": 80.645,
+    "rotation": 270.0
+   },
+   "SW2-Floor3": {
+    "lng": -123.00335478153791,
+    "lat": 49.250348203633855,
+    "widthM": 80.645,
+    "rotation": 270.0
+   }
+  },
+  "notes": {
+   "SW2-Floor1": {
+    "coverage": 0.752,
+    "ownIou": 0.816,
+    "ownRatio": 200
+   },
+   "SW2-Floor2": {
+    "coverage": 0.755,
+    "ownIou": 0.806,
+    "ownRatio": 200
+   },
+   "SW2-Floor3": {
+    "coverage": 0.756,
+    "ownIou": 0.806,
+    "ownRatio": 200
+   }
+  }
+ },
+ "SW9": {
+  "anchor": "SW9-Floor2",
+  "iou": 0.2725,
+  "ratio": 150,
+  "snapped": true,
+  "rotation": 180.0,
+  "runnerUpIou": 0.8977,
+  "ambiguousAngle": true,
+  "northUsed": null,
+  "placements": {
+   "SW9-Floor1": {
+    "lng": -123.00311319883387,
+    "lat": 49.24864397348874,
+    "widthM": 60.48374999999999,
+    "rotation": 180.0
+   },
+   "SW9-Floor2": {
+    "lng": -123.00310651586597,
+    "lat": 49.24864833581703,
+    "widthM": 60.04277777777777,
+    "rotation": 180.0
+   }
+  },
+  "notes": {
+   "SW9-Floor1": {
+    "coverage": 1.0,
+    "ownIou": 0.257,
+    "ownRatio": 150
+   },
+   "SW9-Floor2": {
+    "coverage": 1.0,
+    "ownIou": 0.272,
+    "ownRatio": 150
+   }
+  }
+ }
+}

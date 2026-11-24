@@ -32,14 +32,14 @@ document.addEventListener("DOMContentLoaded", () => {
       const data = await res.json();
 
       if (!res.ok) {
-        alert(data.error || "Error creating node");
+        alert(data.error || "Error Creating Node");
         return;
       }
 
       form.reset();
     } catch (err) {
       console.error(err);
-      alert("Failed to create node");
+      alert("Failed to Create Node");
     }
   });
 });
@@ -118,7 +118,7 @@ async function addFavorite(nodeId) {
   try {
     const user = auth.currentUser;
     if (!user) {
-      alert("Please log in first");
+      alert("Please Log in First");
       return;
     }
 
@@ -135,15 +135,15 @@ async function addFavorite(nodeId) {
 
     const data = await res.json();
     if (!res.ok) {
-      alert(data.error || "Failed to add favorite");
+      alert(data.error || "Failed to Add Favorite");
       return;
     }
 
     console.log("Favorite added:", data.favorite);
-    alert(`Added to favorites!`);
+    alert(`Added to Favorites!`);
   } catch (err) {
     console.error("Network or auth error:", err);
-    alert("Network or auth error while adding favorite");
+    alert("Network or Auth Error While Adding Favorite");
   }
 }
 

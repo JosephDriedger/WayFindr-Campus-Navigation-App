@@ -1,0 +1,981 @@
+{
+ "CARI-Floor1": {
+  "page_w": 3672,
+  "page_h": 2376,
+  "rotation": 270,
+  "crop": [
+   66,
+   89,
+   3601,
+   2329
+  ]
+ },
+ "CARI-Floor2": {
+  "page_w": 3672,
+  "page_h": 2376,
+  "rotation": 270,
+  "crop": [
+   99,
+   92,
+   3635,
+   2331
+  ]
+ },
+ "NE1-Floor1": {
+  "page_w": 2376,
+  "page_h": 3672,
+  "rotation": 0,
+  "crop": [
+   29,
+   29,
+   2345,
+   3641
+  ]
+ },
+ "NE1-Floor2": {
+  "page_w": 2376,
+  "page_h": 3672,
+  "rotation": 0,
+  "crop": [
+   29,
+   29,
+   2346,
+   3642
+  ]
+ },
+ "NE1-Floor3": {
+  "page_w": 2376,
+  "page_h": 3672,
+  "rotation": 0,
+  "crop": [
+   29,
+   29,
+   2346,
+   3642
+  ]
+ },
+ "NE1-Floor4": {
+  "page_w": 2376,
+  "page_h": 3672,
+  "rotation": 0,
+  "crop": [
+   27,
+   27,
+   2348,
+   3644
+  ]
+ },
+ "NE10-Floor1": {
+  "page_w": 3672,
+  "page_h": 2376,
+  "rotation": 90,
+  "crop": [
+   94,
+   94,
+   3522,
+   2281
+  ]
+ },
+ "NE12-Floor1": {
+  "page_w": 3672,
+  "page_h": 2376,
+  "rotation": 90,
+  "crop": [
+   94,
+   94,
+   3522,
+   2281
+  ]
+ },
+ "NE12-Floor2": {
+  "page_w": 3672,
+  "page_h": 2376,
+  "rotation": 0,
+  "crop": [
+   0,
+   0,
+   3671,
+   2375
+  ]
+ },
+ "NE16-Floor1": {
+  "page_w": 2376,
+  "page_h": 3672,
+  "rotation": 0,
+  "crop": [
+   94,
+   148,
+   2280,
+   3576
+  ]
+ },
+ "NE18-Floor1": {
+  "page_w": 3672,
+  "page_h": 2376,
+  "rotation": 270,
+  "crop": [
+   67,
+   119,
+   3498,
+   2308
+  ]
+ },
+ "NE2-Floor1": {
+  "page_w": 3672,
+  "page_h": 2376,
+  "rotation": 270,
+  "crop": [
+   92,
+   39,
+   3632,
+   2336
+  ]
+ },
+ "NE2-Floor2": {
+  "page_w": 3672,
+  "page_h": 2376,
+  "rotation": 270,
+  "crop": [
+   94,
+   40,
+   3631,
+   2335
+  ]
+ },
+ "NE20-Floor1": {
+  "page_w": 3672,
+  "page_h": 2376,
+  "rotation": 270,
+  "crop": [
+   94,
+   41,
+   3630,
+   2334
+  ]
+ },
+ "NE20-Floor2": {
+  "page_w": 3672,
+  "page_h": 2376,
+  "rotation": 270,
+  "crop": [
+   121,
+   119,
+   3552,
+   2308
+  ]
+ },
+ "NE22-Floor1": {
+  "page_w": 2376,
+  "page_h": 3672,
+  "rotation": 0,
+  "crop": [
+   62,
+   78,
+   2302,
+   3614
+  ]
+ },
+ "NE23-Floor1": {
+  "page_w": 3672,
+  "page_h": 2376,
+  "rotation": 270,
+  "crop": [
+   148,
+   94,
+   3577,
+   2281
+  ]
+ },
+ "NE24-Floor1": {
+  "page_w": 3672,
+  "page_h": 2376,
+  "rotation": 270,
+  "crop": [
+   121,
+   119,
+   3552,
+   2308
+  ]
+ },
+ "NE25-Floor1": {
+  "page_w": 3672,
+  "page_h": 2376,
+  "rotation": 270,
+  "crop": [
+   94,
+   40,
+   3631,
+   2335
+  ]
+ },
+ "NE25-Floor2": {
+  "page_w": 3672,
+  "page_h": 2376,
+  "rotation": 270,
+  "crop": [
+   92,
+   39,
+   3632,
+   2336
+  ]
+ },
+ "NE25-Floor3": {
+  "page_w": 3672,
+  "page_h": 2376,
+  "rotation": 270,
+  "crop": [
+   94,
+   41,
+   3630,
+   2335
+  ]
+ },
+ "NE28-Floor1": {
+  "page_w": 2376,
+  "page_h": 3672,
+  "rotation": 0,
+  "crop": [
+   95,
+   149,
+   2279,
+   3575
+  ]
+ },
+ "NE3-Floor1": {
+  "page_w": 3672,
+  "page_h": 2376,
+  "rotation": 270,
+  "crop": [
+   94,
+   41,
+   3630,
+   2335
+  ]
+ },
+ "NE3-Floor2": {
+  "page_w": 3672,
+  "page_h": 2376,
+  "rotation": 270,
+  "crop": [
+   67,
+   119,
+   3498,
+   2308
+  ]
+ },
+ "NE4-Floor1": {
+  "page_w": 3672,
+  "page_h": 2376,
+  "rotation": 90,
+  "crop": [
+   94,
+   40,
+   3630,
+   2335
+  ]
+ },
+ "NE4-Floor2": {
+  "page_w": 3672,
+  "page_h": 2376,
+  "rotation": 270,
+  "crop": [
+   94,
+   40,
+   3631,
+   2335
+  ]
+ },
+ "NE6-Floor1": {
+  "page_w": 3672,
+  "page_h": 2376,
+  "rotation": 90,
+  "crop": [
+   94,
+   40,
+   3630,
+   2335
+  ]
+ },
+ "NE6-Floor2": {
+  "page_w": 3672,
+  "page_h": 2376,
+  "rotation": 90,
+  "crop": [
+   94,
+   40,
+   3630,
+   2335
+  ]
+ },
+ "NE7-Floor1": {
+  "page_w": 2376,
+  "page_h": 3672,
+  "rotation": 0,
+  "crop": [
+   94,
+   148,
+   2280,
+   3577
+  ]
+ },
+ "NE8-Floor1": {
+  "page_w": 3672,
+  "page_h": 2376,
+  "rotation": 90,
+  "crop": [
+   94,
+   94,
+   3522,
+   2281
+  ]
+ },
+ "NE8-Floor2": {
+  "page_w": 3672,
+  "page_h": 2376,
+  "rotation": 270,
+  "crop": [
+   67,
+   119,
+   3498,
+   2308
+  ]
+ },
+ "NE9-Floor1": {
+  "page_w": 3672,
+  "page_h": 2376,
+  "rotation": 270,
+  "crop": [
+   94,
+   94,
+   3523,
+   2281
+  ]
+ },
+ "NE9-Floor2": {
+  "page_w": 3672,
+  "page_h": 2376,
+  "rotation": 270,
+  "crop": [
+   94,
+   94,
+   3523,
+   2281
+  ]
+ },
+ "NW1-Floor1": {
+  "page_w": 3672,
+  "page_h": 2376,
+  "rotation": 270,
+  "crop": [
+   92,
+   39,
+   3632,
+   2336
+  ]
+ },
+ "NW3-Floor1": {
+  "page_w": 2376,
+  "page_h": 3672,
+  "rotation": 0,
+  "crop": [
+   27,
+   27,
+   2348,
+   3644
+  ]
+ },
+ "NW3-Floor2": {
+  "page_w": 3672,
+  "page_h": 2376,
+  "rotation": 270,
+  "crop": [
+   93,
+   120,
+   3523,
+   2308
+  ]
+ },
+ "NW4-Floor1": {
+  "page_w": 2376,
+  "page_h": 3672,
+  "rotation": 0,
+  "crop": [
+   0,
+   0,
+   2375,
+   3671
+  ]
+ },
+ "NW4-Floor2": {
+  "page_w": 2376,
+  "page_h": 3672,
+  "rotation": 0,
+  "crop": [
+   0,
+   0,
+   2375,
+   3671
+  ]
+ },
+ "NW4-Floor3": {
+  "page_w": 2376,
+  "page_h": 3672,
+  "rotation": 0,
+  "crop": [
+   30,
+   30,
+   2345,
+   3641
+  ]
+ },
+ "NW4-Floor4": {
+  "page_w": 2376,
+  "page_h": 3672,
+  "rotation": 0,
+  "crop": [
+   30,
+   30,
+   2345,
+   3641
+  ]
+ },
+ "NW5-Floor1": {
+  "page_w": 3672,
+  "page_h": 2376,
+  "rotation": 270,
+  "crop": [
+   92,
+   93,
+   3524,
+   2282
+  ]
+ },
+ "NW5-Floor2": {
+  "page_w": 3672,
+  "page_h": 2376,
+  "rotation": 270,
+  "crop": [
+   119,
+   93,
+   3551,
+   2282
+  ]
+ },
+ "NW6-Floor1": {
+  "page_w": 3672,
+  "page_h": 2376,
+  "rotation": 270,
+  "crop": [
+   119,
+   93,
+   3551,
+   2282
+  ]
+ },
+ "NW6-Floor2": {
+  "page_w": 3672,
+  "page_h": 2376,
+  "rotation": 270,
+  "crop": [
+   119,
+   93,
+   3551,
+   2282
+  ]
+ },
+ "SE1-Floor1": {
+  "page_w": 3672,
+  "page_h": 2376,
+  "rotation": 90,
+  "crop": [
+   29,
+   29,
+   3642,
+   2346
+  ]
+ },
+ "SE1-Floor2": {
+  "page_w": 3672,
+  "page_h": 2376,
+  "rotation": 90,
+  "crop": [
+   28,
+   13,
+   3642,
+   2361
+  ]
+ },
+ "SE10-Floor1": {
+  "page_w": 2376,
+  "page_h": 3672,
+  "rotation": 0,
+  "crop": [
+   94,
+   94,
+   2280,
+   3522
+  ]
+ },
+ "SE10-Floor2": {
+  "page_w": 2376,
+  "page_h": 3672,
+  "rotation": 0,
+  "crop": [
+   67,
+   65,
+   2256,
+   3496
+  ]
+ },
+ "SE12-Floor1": {
+  "page_w": 2376,
+  "page_h": 3672,
+  "rotation": 0,
+  "crop": [
+   94,
+   94,
+   2281,
+   3523
+  ]
+ },
+ "SE12-Floor2": {
+  "page_w": 3672,
+  "page_h": 2376,
+  "rotation": 270,
+  "crop": [
+   94,
+   41,
+   3630,
+   2335
+  ]
+ },
+ "SE12-Floor3": {
+  "page_w": 3672,
+  "page_h": 2376,
+  "rotation": 270,
+  "crop": [
+   94,
+   94,
+   3523,
+   2281
+  ]
+ },
+ "SE12-Floor4": {
+  "page_w": 3672,
+  "page_h": 2376,
+  "rotation": 90,
+  "crop": [
+   94,
+   40,
+   3630,
+   2334
+  ]
+ },
+ "SE14-Floor1": {
+  "page_w": 3672,
+  "page_h": 2376,
+  "rotation": 90,
+  "crop": [
+   15,
+   14,
+   3656,
+   2360
+  ]
+ },
+ "SE14-Floor2": {
+  "page_w": 3672,
+  "page_h": 2376,
+  "rotation": 90,
+  "crop": [
+   94,
+   40,
+   3630,
+   2335
+  ]
+ },
+ "SE14-Floor3": {
+  "page_w": 3672,
+  "page_h": 2376,
+  "rotation": 90,
+  "crop": [
+   94,
+   40,
+   3630,
+   2335
+  ]
+ },
+ "SE16-Floor1": {
+  "page_w": 2376,
+  "page_h": 3672,
+  "rotation": 0,
+  "crop": [
+   65,
+   34,
+   2309,
+   3529
+  ]
+ },
+ "SE2-Floor1": {
+  "page_w": 3672,
+  "page_h": 2376,
+  "rotation": 270,
+  "crop": [
+   95,
+   41,
+   3630,
+   2334
+  ]
+ },
+ "SE2-Floor2": {
+  "page_w": 3672,
+  "page_h": 2376,
+  "rotation": 270,
+  "crop": [
+   94,
+   41,
+   3630,
+   2335
+  ]
+ },
+ "SE2-Floor3": {
+  "page_w": 3672,
+  "page_h": 2376,
+  "rotation": 270,
+  "crop": [
+   95,
+   41,
+   3630,
+   2334
+  ]
+ },
+ "SE30-Floor1": {
+  "page_w": 3672,
+  "page_h": 2376,
+  "rotation": 270,
+  "crop": [
+   93,
+   120,
+   3523,
+   2308
+  ]
+ },
+ "SE4-Floor1": {
+  "page_w": 3672,
+  "page_h": 2270,
+  "rotation": 0,
+  "crop": [
+   94,
+   40,
+   3523,
+   2227
+  ]
+ },
+ "SE40-Floor1": {
+  "page_w": 3672,
+  "page_h": 2376,
+  "rotation": 90,
+  "crop": [
+   94,
+   40,
+   3630,
+   2335
+  ]
+ },
+ "SE40-Floor2": {
+  "page_w": 3672,
+  "page_h": 2376,
+  "rotation": 270,
+  "crop": [
+   92,
+   39,
+   3632,
+   2336
+  ]
+ },
+ "SE41-Floor1": {
+  "page_w": 2376,
+  "page_h": 3672,
+  "rotation": 0,
+  "crop": [
+   94,
+   94,
+   2375,
+   3671
+  ]
+ },
+ "SE41-Floor2": {
+  "page_w": 2376,
+  "page_h": 3672,
+  "rotation": 0,
+  "crop": [
+   94,
+   0,
+   2375,
+   3671
+  ]
+ },
+ "SE42-Floor1": {
+  "page_w": 3672,
+  "page_h": 2376,
+  "rotation": 270,
+  "crop": [
+   121,
+   94,
+   3550,
+   2281
+  ]
+ },
+ "SE42-Floor2": {
+  "page_w": 3672,
+  "page_h": 2376,
+  "rotation": 270,
+  "crop": [
+   94,
+   95,
+   3523,
+   2281
+  ]
+ },
+ "SE50-Floor1": {
+  "page_w": 3672,
+  "page_h": 2376,
+  "rotation": 270,
+  "crop": [
+   94,
+   95,
+   3522,
+   2281
+  ]
+ },
+ "SE6-Floor1": {
+  "page_w": 2376,
+  "page_h": 3672,
+  "rotation": 0,
+  "crop": [
+   94,
+   94,
+   2280,
+   3523
+  ]
+ },
+ "SE6-Floor2": {
+  "page_w": 2376,
+  "page_h": 3672,
+  "rotation": 0,
+  "crop": [
+   94,
+   94,
+   2280,
+   3523
+  ]
+ },
+ "SE6-Floor3": {
+  "page_w": 2376,
+  "page_h": 3672,
+  "rotation": 0,
+  "crop": [
+   67,
+   65,
+   2256,
+   3496
+  ]
+ },
+ "SE8-Floor1": {
+  "page_w": 3672,
+  "page_h": 2376,
+  "rotation": 270,
+  "crop": [
+   48,
+   61,
+   3513,
+   2309
+  ]
+ },
+ "SE8-Floor2": {
+  "page_w": 3672,
+  "page_h": 2376,
+  "rotation": 270,
+  "crop": [
+   95,
+   41,
+   3630,
+   2334
+  ]
+ },
+ "SE9-Floor1": {
+  "page_w": 3672,
+  "page_h": 2376,
+  "rotation": 90,
+  "crop": [
+   94,
+   94,
+   3522,
+   2280
+  ]
+ },
+ "SW1-Floor1": {
+  "page_w": 3672,
+  "page_h": 2376,
+  "rotation": 270,
+  "crop": [
+   0,
+   0,
+   3671,
+   2375
+  ]
+ },
+ "SW1-Floor2": {
+  "page_w": 3672,
+  "page_h": 2376,
+  "rotation": 90,
+  "crop": [
+   542,
+   49,
+   3482,
+   2333
+  ]
+ },
+ "SW1-Floor3": {
+  "page_w": 3672,
+  "page_h": 2376,
+  "rotation": 270,
+  "crop": [
+   112,
+   42,
+   3565,
+   2333
+  ]
+ },
+ "SW1-Floor4": {
+  "page_w": 3672,
+  "page_h": 2376,
+  "rotation": 270,
+  "crop": [
+   132,
+   42,
+   3634,
+   2300
+  ]
+ },
+ "SW2-Floor1": {
+  "page_w": 3672,
+  "page_h": 2376,
+  "rotation": 270,
+  "crop": [
+   119,
+   93,
+   3551,
+   2282
+  ]
+ },
+ "SW2-Floor2": {
+  "page_w": 3672,
+  "page_h": 2376,
+  "rotation": 270,
+  "crop": [
+   121,
+   95,
+   3549,
+   2281
+  ]
+ },
+ "SW2-Floor3": {
+  "page_w": 3672,
+  "page_h": 2376,
+  "rotation": 270,
+  "crop": [
+   121,
+   95,
+   3549,
+   2281
+  ]
+ },
+ "SW3-Floor1": {
+  "page_w": 3672,
+  "page_h": 2376,
+  "rotation": 270,
+  "crop": [
+   95,
+   41,
+   3630,
+   2334
+  ]
+ },
+ "SW3-Floor2": {
+  "page_w": 3672,
+  "page_h": 2376,
+  "rotation": 270,
+  "crop": [
+   95,
+   41,
+   3631,
+   2335
+  ]
+ },
+ "SW3-Floor3": {
+  "page_w": 3672,
+  "page_h": 2376,
+  "rotation": 270,
+  "crop": [
+   94,
+   40,
+   3631,
+   2335
+  ]
+ },
+ "SW3-Floor4": {
+  "page_w": 3672,
+  "page_h": 2376,
+  "rotation": 270,
+  "crop": [
+   94,
+   41,
+   3630,
+   2335
+  ]
+ },
+ "SW5-Floor1": {
+  "page_w": 3672,
+  "page_h": 2376,
+  "rotation": 270,
+  "crop": [
+   93,
+   120,
+   3523,
+   2308
+  ]
+ },
+ "SW5-Floor2": {
+  "page_w": 3672,
+  "page_h": 2376,
+  "rotation": 90,
+  "crop": [
+   122,
+   95,
+   3548,
+   2279
+  ]
+ },
+ "SW9-Floor1": {
+  "page_w": 3672,
+  "page_h": 2376,
+  "rotation": 90,
+  "crop": [
+   121,
+   94,
+   3549,
+   2280
+  ]
+ },
+ "SW9-Floor2": {
+  "page_w": 3672,
+  "page_h": 2376,
+  "rotation": 270,
+  "crop": [
+   106,
+   134,
+   3509,
+   2295
+  ]
+ }
+}

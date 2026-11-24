@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= title %></title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+
+<body>
+  <%- include('_menu', { page: '403', user: user }) %>
+
+  <main class="about">
+    <div class="about-content">
+      <h2>That Page Is For Map Administrators</h2>
+      <p>
+        You Are Signed in, but This Page Is Part of How the Campus Map Is
+        Maintained — Tracing Floors and Keeping BCIT's Drawings Up to Date —
+        Rather than Part of Finding Your Way Around It.
+      </p>
+      <p>
+        If Looking After the Map Is Your Job, Ask Whoever Runs Wayfindr to Add
+        Your Account as an Administrator.
+      </p>
+      <div class="notfound-links">
+        <a href="/map" class="btn">Open the Map</a>
+        <a href="/" class="btn secondary">Home</a>
+      </div>
+    </div>
+  </main>
+</body>
+
+</html>

@@ -93,6 +93,101 @@ nav {
   top: 0;
 }
 
+/* The admin menu: one heading in the bar, its pages hanging under it.
+   Built on <details>, so it opens on click and on Enter and needs no
+   script to work -- the script only closes it when you look elsewhere. */
+.nav-dropdown > details {
+  position: relative;
+}
+
+.nav-dropdown summary {
+  display: block;
+  list-style: none;
+  background: transparent;
+  color: #e0f0fb;
+  padding: 0.55rem 1.1rem;
+  border-radius: 999px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+/* Safari draws its own triangle through ::-webkit-details-marker, and
+   every other browser through the list marker; both have to go, or the
+   chip has a stray arrow inside it. */
+.nav-dropdown summary::-webkit-details-marker {
+  display: none;
+}
+
+/* The caret is drawn, not typed. A character here has to survive every tool
+   between the stylesheet and the screen, and then be present in whatever font
+   the browser picked; three borders depend on neither, and cannot arrive as a
+   box with letters after it. */
+.nav-dropdown summary::after {
+  content: "";
+  display: inline-block;
+  margin-left: 0.45em;
+  vertical-align: 0.12em;
+  border-left: 0.3em solid transparent;
+  border-right: 0.3em solid transparent;
+  border-top: 0.33em solid currentColor;
+  opacity: 0.85;
+  transition: transform 0.15s ease;
+}
+
+/* and it points up while the menu is open */
+.nav-dropdown details[open] > summary::after {
+  transform: rotate(180deg);
+}
+
+.nav-dropdown summary:hover,
+.nav-dropdown details[open] > summary {
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+}
+
+/* The current page is marked the same way everywhere else in the bar. */
+.nav-dropdown summary.active {
+  background: #fff;
+  color: #005f99;
+  font-weight: 700;
+}
+
+.nav-submenu {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 210px;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  text-align: left;
+}
+
+.nav-submenu li a {
+  display: block;
+  padding: 0.5rem 0.8rem;
+  border-radius: 8px;
+  color: #1f2937;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.nav-submenu li a:hover {
+  background: #eaf4fd;
+  color: #005f99;
+}
+
+.nav-submenu li a[aria-current="page"] {
+  background: #007acc;
+  color: #fff;
+}
+
 .nav-menu li span.active {
   display: block;
   background: #fff;

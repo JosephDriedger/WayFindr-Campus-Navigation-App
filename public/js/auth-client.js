@@ -41,7 +41,7 @@ loginForm.addEventListener('submit', async (e) => {
 
   } catch (err) {
     console.error(err);
-    errorElem.textContent = "Invalid credentials or network error. " + err;
+    errorElem.textContent = "Invalid Credentials or Network Error. " + err;
   }
 });
 

@@ -397,7 +397,7 @@ window.addEventListener("DOMContentLoaded", () => {
         esc(b.code),
         `${b.floors} floor${b.floors === 1 ? '' : 's'} · ${b.rooms} rooms`
       )).join('')
-      : '<li class="sidebar-hint">No floor plan data is loaded yet.</li>';
+      : '<li class="sidebar-hint">No Floor Plan Data Is Loaded Yet.</li>';
   }
 
   // "SW3-1600", "sw3 1600" and a bare "1600" all mean something here; the
@@ -475,13 +475,13 @@ window.addEventListener("DOMContentLoaded", () => {
     const fromRef = parseRoomRef(form.from.value);
     const toRef = parseRoomRef(form.to.value);
     if (!toRef) {
-      showError('Enter a room, a building or a car park to go to.');
+      showError('Enter a Room, a Building or a Car Park to Go To.');
       return false;
     }
     for (const ref of [fromRef, toRef]) {
       if (ref?.ambiguous) {
-        showError(`More than one room is called ${ref.ambiguous}. `
-          + 'Pick the one you mean from the list.');
+        showError(`More than One Room Is Called ${ref.ambiguous}. `
+          + 'Pick the One You Mean from the List.');
         return false;
       }
     }
@@ -494,13 +494,13 @@ window.addEventListener("DOMContentLoaded", () => {
     const named = [fromRef?.building, toRef.building].filter(Boolean);
     const fallback = named.find((code) => !isLot(code)) || '';
     if (!fallback && ((fromRef && !fromRef.building) || !toRef.building)) {
-      showError('Include the building code on the room, e.g. SW3-1750.');
+      showError('Include the Building Code on the Room, e.g. SW3-1750.');
       return false;
     }
     const to = endFromText(form.to.value, fallback);
     const from = endFromText(form.from.value, fallback);
     if (!to.building && !to.ref) {
-      showError('Include the building code, e.g. SW3-1600 or just SW3.');
+      showError('Include the Building Code, e.g. SW3-1600 or Just SW3.');
       return false;
     }
     if (!from) {
@@ -531,7 +531,7 @@ window.addEventListener("DOMContentLoaded", () => {
     }
 
     renderDirectionsCard({
-      fromLabel: 'Finding your location…', toLabel: to.label,
+      fromLabel: 'Finding Your Location…', toLabel: to.label,
     });
     const here = await requestUserLocation();
     if (here) {
@@ -543,8 +543,8 @@ window.addEventListener("DOMContentLoaded", () => {
     // ask. The message goes into the form's own error line rather than onto a
     // card of its own: "say where you are starting from" is only useful next
     // to the box you would say it in.
-    const message = `Going to ${to.label}. Turn on location, or say where you `
-      + 'are starting from.';
+    const message = `Going to ${to.label}. Turn on Location, or Say Where You `
+      + 'Are Starting From.';
     if (onError) return onError(message);
     await renderBrowse();
     const form = document.querySelector('.browse-directions');
@@ -668,7 +668,7 @@ window.addEventListener("DOMContentLoaded", () => {
         </div>
       `
     ).join('')
-      : `<div style="padding:.55rem .6rem;opacity:.7;">No floor plans found.</div>`;
+      : `<div style="padding:.55rem .6rem;opacity:.7;">No Floor Plans Found.</div>`;
 
     return `
       <div class="bcit-popup" style="font-family:system-ui;width:360px;">
@@ -849,11 +849,11 @@ window.addEventListener("DOMContentLoaded", () => {
         if (leg.space) return leg.space;
         if (leg.name) return leg.name;
         // an anchor with nothing to call it: where the phone put you
-        if (leg.kind === 'anchor') return 'where you are';
+        if (leg.kind === 'anchor') return 'Where You Are';
         if (leg.type === 'stairs') return 'the stairs';
         if (leg.type === 'elevator') return 'the lift';
         // Outside there are no room numbers at all.
-        if (!leg.building) return 'the path outside';
+        if (!leg.building) return 'The Path Outside';
         // A node in a place but on no floor is outdoors in it -- the path at
         // a building's door, or a car park, which has no hallways. "Start at
         // the hallway" was what a route out of Lot F opened with.
@@ -879,7 +879,7 @@ window.addEventListener("DOMContentLoaded", () => {
         // That walk happens before you get where it takes you, so it goes
         // above the heading for that place rather than under it.
         if (approach >= 1 && i > 0 && leg.kind !== 'anchor') {
-          push(`Head ${approach} m to the mapped paths`);
+          push(`Head ${approach} m to the Mapped Paths`);
         }
         const zone = !leg.building ? 'Outside'
           : leg.floor ? `${leg.building} · Floor ${leg.floor}`
@@ -892,7 +892,7 @@ window.addEventListener("DOMContentLoaded", () => {
         if (leg.building) lastBuilding = leg.building;
         if (i === 0) {
           push(`Start at ${named(leg)}`);
-          if (approach >= 1) push(`Head ${approach} m to the mapped paths`);
+          if (approach >= 1) push(`Head ${approach} m to the Mapped Paths`);
           // You can walk a long way before reaching anything worth naming --
           // 52 m along the corridor you started in was being left out of the
           // steps entirely.
@@ -923,7 +923,7 @@ window.addEventListener("DOMContentLoaded", () => {
       ? `<p class="directions-error">${message}</p>`
       : path
         ? `<div class="directions-summary">${distanceM}m &middot; ${stepCount} step${stepCount === 1 ? '' : 's'}</div><ol class="directions-steps">${stepsHtml}</ol>`
-        : `<p class="sidebar-hint">Finding route…</p>`;
+        : `<p class="sidebar-hint">Finding Route…</p>`;
 
     sidebar.setBody(`
       <button type="button" class="sidebar-back" onclick="window.BCITMap.clearNavigation()">&larr; Back</button>
@@ -1200,7 +1200,7 @@ window.addEventListener("DOMContentLoaded", () => {
       const result = await response.json().catch(() => null);
       if (!response.ok || !result || !result.success) {
         console.warn('[INDOOR PATH]', result?.message || response.statusText);
-        renderDirectionsCard({ fromLabel, toLabel, message: result?.message || 'No route to there yet.' });
+        renderDirectionsCard({ fromLabel, toLabel, message: result?.message || 'No Route to There Yet.' });
         return false;
       }
 
@@ -1257,7 +1257,7 @@ window.addEventListener("DOMContentLoaded", () => {
       return sheets.length ? sheets[sheets.length - 1] : true;
     } catch (error) {
       console.error('[INDOOR PATH ERROR]:', error);
-      renderDirectionsCard({ fromLabel, toLabel, message: 'Something went wrong finding that route.' });
+      renderDirectionsCard({ fromLabel, toLabel, message: 'Something Went Wrong Finding That Route.' });
       return false;
     } finally {
       isOverlayingIndoor = false;
@@ -1294,7 +1294,7 @@ window.addEventListener("DOMContentLoaded", () => {
   // Helper: Get current user's ID token for server requests
   async function getIdToken() {
     const user = auth.currentUser;
-    if (!user) throw new Error("Not authenticated. Please log in.");
+    if (!user) throw new Error("Not Authenticated. Please Log In.");
     return await user.getIdToken(/* forceRefresh */ true);
   }
 
@@ -1325,7 +1325,7 @@ window.addEventListener("DOMContentLoaded", () => {
     const e = due.entry;
     const when = due.status === 'now'
       ? 'on now'
-      : `starts in ${due.until} min`;
+      : `Starts in ${due.until} Min`;
     bannerEl.innerHTML = `
       <div class="class-banner-text">
         <strong>${esc(e.title)}</strong> ${esc(when)} · ${esc(e.building)}-${esc(e.room)}
@@ -1344,7 +1344,7 @@ window.addEventListener("DOMContentLoaded", () => {
     try {
       const token = await getIdToken();
       const favRes = await fetch('/api/favorites', { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' });
-      if (!favRes.ok) throw new Error('Failed to load favorites');
+      if (!favRes.ok) throw new Error('Failed to Load Favorites');
       const { favorites } = await favRes.json();
 
       const roomFavs = favorites.filter(f => f.nodeMeta?.kind === 'room');
@@ -1414,13 +1414,13 @@ window.addEventListener("DOMContentLoaded", () => {
           nodeMeta: { kind: 'room', building, floor, room, lng: payload.lng, lat: payload.lat },
         }),
       });
-      if (!res.ok) throw new Error('Failed to save favorite');
+      if (!res.ok) throw new Error('Failed to Save Favorite');
       loadFavoriteMarkers();
     } catch (err) {
       console.warn('toggleFavoriteRoom failed:', err);
-      alert(err.message === 'Not authenticated. Please log in.'
-        ? 'Log in to save favorites.'
-        : 'Could not save favorite: ' + err.message);
+      alert(err.message === 'Not Authenticated. Please Log In.'
+        ? 'Log in to Save Favorites.'
+        : 'Could Not Save Favorite: ' + err.message);
     }
   }
 

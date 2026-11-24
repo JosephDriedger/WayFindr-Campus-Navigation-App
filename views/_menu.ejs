@@ -36,13 +36,36 @@
           <% } %>
         </li>
 
-        <li>
-            <% if(page === 'admin'){ %>
-            <span class="active">Tracer</span>
-            <% } else { %>
-            <a href="/admin">Tracer</a>
-            <% } %>
+        <%
+          // The maintenance pages, behind one heading rather than spread
+          // across the bar: there are three of them now and they are one job,
+          // done by a few people, while everything to the left is the app
+          // everybody uses. They refuse anyone who is not an administrator, so
+          // for everyone else this is a heading to pages that turn them away
+          // and it is not drawn at all. isAdmin is set for every render in
+          // server.js.
+          //
+          // A <details> rather than a scripted menu: it opens on click and on
+          // Enter, closes on Escape, and works before any JavaScript loads.
+          const adminPages = ['admin', 'tracer', 'plans', 'users'];
+          const inAdmin = adminPages.indexOf(page) !== -1;
+        %>
+        <% if (typeof isAdmin !== "undefined" && isAdmin) { %>
+        <li class="nav-dropdown">
+          <details>
+            <%# open on click only: the submenu hangs over the page, so one
+                that opened itself on every admin page would cover the top of
+                whatever you came to look at %>
+            <summary class="<%= inAdmin ? 'active' : '' %>">Admin</summary>
+            <ul class="nav-submenu">
+              <li><a href="/admin"<%= page === 'admin' ? ' aria-current="page"' : '' %>>Dashboard</a></li>
+              <li><a href="/admin/tracer"<%= page === 'tracer' ? ' aria-current="page"' : '' %>>Floor Plan Tracer</a></li>
+              <li><a href="/admin/plans"<%= page === 'plans' ? ' aria-current="page"' : '' %>>Floor Plans</a></li>
+              <li><a href="/admin/users"<%= page === 'users' ? ' aria-current="page"' : '' %>>People</a></li>
+            </ul>
+          </details>
         </li>
+        <% } %>
 
         <li>
             <% if(page === 'about'){ %>
@@ -61,7 +84,7 @@
         %>
         <li id="authLink">
           <% if (typeof user !== "undefined" && user) { %>
-            <a href="#" id="logoutBtn">Log out</a>
+            <a href="#" id="logoutBtn">Log Out</a>
           <% } else { %>
             <a href="/auth/login" class="<%= page === 'login' ? 'active' : '' %>">Login</a>
           <% } %>

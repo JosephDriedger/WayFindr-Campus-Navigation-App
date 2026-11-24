@@ -115,3 +115,80 @@ describe("Auth Middleware", () => {
     expect(res.redirect).toHaveBeenCalledWith("/auth/login");
   });
 });
+
+// The maintenance pages -- the tracer and the floor-plan library -- rewrite
+// the campus data every other page reads. Being signed in is not the
+// question; who you are is, and there is one place that answers it: the
+// `admin` custom claim, carried on the session from sign-in.
+describe("Who maintains the map", () => {
+  let req, res, next;
+
+  beforeEach(() => {
+    req = { headers: { accept: "text/html" }, session: {}, xhr: false };
+    res = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn(),
+      redirect: jest.fn(),
+      render: jest.fn(),
+    };
+    next = jest.fn();
+  });
+
+  test("the claim is the whole answer", () => {
+    expect(middleware.isAdmin({ uid: "1", email: "maps@bcit.ca", admin: true })).toBe(true);
+    expect(middleware.isAdmin({ uid: "2", email: "maps@bcit.ca", admin: false })).toBe(false);
+    expect(middleware.isAdmin({ uid: "3", email: "student@my.bcit.ca" })).toBe(false);
+    expect(middleware.isAdmin({ uid: "4" })).toBe(false);
+    expect(middleware.isAdmin(null)).toBe(false);
+  });
+
+  // An address cannot make somebody an administrator, however it is spelled or
+  // wherever it appears: there is no list of addresses any more.
+  test("an address is not a way in", () => {
+    process.env.ADMIN_EMAILS = "maps@bcit.ca";
+    expect(middleware.isAdmin({ email: "maps@bcit.ca" })).toBe(false);
+    delete process.env.ADMIN_EMAILS;
+  });
+
+  test("a visitor is sent to sign in, because that may be all they are missing", () => {
+    middleware.requireAdmin(req, res, next);
+    expect(res.redirect).toHaveBeenCalledWith("/auth/login");
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  test("someone already signed in is told plainly, not bounced to a login page", () => {
+    req.session.user = { email: "student@my.bcit.ca" };
+    middleware.requireAdmin(req, res, next);
+    expect(res.redirect).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.render).toHaveBeenCalledWith("no-access", expect.any(Object));
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  test("an /admin/api call is refused with JSON, whatever it asks for", () => {
+    req.headers.accept = "*/*";
+    req.originalUrl = "/admin/api/library";
+    req.session.user = { email: "student@my.bcit.ca" };
+    middleware.requireAdmin(req, res, next);
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith({
+      error: "This Is Only for Map Administrators",
+    });
+  });
+
+  test("an admin is let through", () => {
+    req.session.user = { uid: "1", email: "maps@bcit.ca", admin: true };
+    middleware.requireAdmin(req, res, next);
+    expect(next).toHaveBeenCalled();
+  });
+
+  test("refreshing a session from a token does not demote an administrator", async () => {
+    req.session.user = { uid: "9", email: "someone@bcit.ca", admin: true };
+    req.headers.authorization = "Bearer valid-token";
+    mockVerifyIdToken.mockResolvedValue({ uid: "9", email: "someone@bcit.ca" });
+
+    await middleware.verifyFirebaseToken(req, res, next);
+
+    expect(middleware.isAdmin(req.session.user)).toBe(true);
+  });
+});

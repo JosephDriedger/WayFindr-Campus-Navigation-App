@@ -55,6 +55,9 @@ def main():
                 "name": name,
                 "type": props.get("type", "room"),
                 "confidence": props.get("confidence"),
+                # A room nobody has checked is still a room you can search
+                # for; it just says so, so the ones to fix can be listed.
+                "check": True if props.get("check") else None,
                 "source": source,
                 "query": f"{label} {name}" if name else label,
             })

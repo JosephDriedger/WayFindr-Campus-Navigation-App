@@ -54,17 +54,46 @@ describe("Access", () => {
     expect(res.status).toBe(302);
   });
 
-  // The tracer is open while the campus is being traced, so its API answers
-  // with data rather than the login page -- which the page could not read.
-  test("GET /admin is reachable without a session", async () => {
+  // The tracer and the plan library maintain the map: they overwrite the
+  // campus data every other page reads. They are for administrators, and a
+  // visitor is sent to sign in rather than shown either.
+  test("GET /admin sends a signed-out visitor to the login page", async () => {
     const res = await request(app).get("/admin");
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(302);
+    expect(res.header.location).toBe("/auth/login");
   });
 
-  test("GET /admin/api/plans returns JSON, not the login page", async () => {
+  test("every admin page sends a signed-out visitor to the login page", async () => {
+    for (const url of ["/admin/tracer", "/admin/plans", "/admin/users"]) {
+      const res = await request(app).get(url);
+      expect(res.status).toBe(302);
+      expect(res.header.location).toBe("/auth/login");
+    }
+  });
+
+  test("the accounts cannot be read, let alone changed, without signing in", async () => {
+    const read = await request(app).get("/admin/api/users");
+    expect(read.status).toBe(401);
+
+    const write = await request(app)
+      .post("/admin/api/users/somebody/admin")
+      .send({ admin: true });
+    expect(write.status).toBe(401);
+  });
+
+  // fetch() sends a wildcard Accept, so answering these with the login PAGE
+  // is what made the tracer fail on "Unexpected token '<'".
+  test("GET /admin/api/plans answers with JSON rather than the login page", async () => {
     const res = await request(app).get("/admin/api/plans");
+    expect(res.status).toBe(401);
+    expect(res.body).toEqual({ error: "Sign in First" });
+  });
+
+  test("the menu offers no maintenance links to someone who is not an admin", async () => {
+    const res = await request(app).get("/");
     expect(res.status).toBe(200);
-    expect(Array.isArray(JSON.parse(res.text).plans)).toBe(true);
+    expect(res.text).not.toContain('href="/admin"');
+    expect(res.text).not.toContain('href="/admin/plans"');
   });
 });
 

@@ -1,0 +1,324 @@
+/* Floor plan library
+   Reads as a page of records rather than a tool: the tracer is where you
+   work, this is where you see what the app has and hand it a new drawing. */
+
+.plans-shell {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 24px 20px 64px;
+  text-align: left;
+}
+
+.plans-head h2 {
+  margin: 0 0 6px;
+  font-size: 1.5rem;
+}
+
+.plans-lede {
+  margin: 0;
+  max-width: 62ch;
+  color: #4b5563;
+}
+
+.plans-block {
+  margin-top: 32px;
+}
+
+.plans-block h3 {
+  margin: 0 0 10px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #6b7280;
+}
+
+.plans-head-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.plans-count {
+  color: #9ca3af;
+  font-weight: 600;
+}
+
+.plans-note {
+  color: #6b7280;
+  font-size: 0.82rem;
+}
+
+/* Something that is not wrong yet, but will be if nobody looks at it. */
+.plans-warn {
+  color: #b45309;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.plans-filter {
+  padding: 7px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font: inherit;
+  min-width: 220px;
+}
+
+/* ------------------------------- Dropping ------------------------------- */
+.plans-drop {
+  border: 2px dashed #bfdbfe;
+  border-radius: 14px;
+  background: #f8fbff;
+  padding: 26px 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.plans-drop:hover,
+.plans-drop:focus-visible,
+.plans-drop.is-over {
+  border-color: #007acc;
+  background: #eaf4fd;
+  outline: none;
+}
+
+.plans-drop-main {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.plans-hint {
+  margin: 6px 0 0;
+  color: #6b7280;
+  font-size: 0.86rem;
+}
+
+.plans-hint code {
+  background: #eef2f7;
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
+.plans-link {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: #007acc;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* ------------------------------- Tables --------------------------------- */
+.plans-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+  font-size: 0.9rem;
+}
+
+.plans-table th {
+  text-align: left;
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6b7280;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 6px 8px;
+}
+
+.plans-table td {
+  padding: 10px 8px;
+  border-bottom: 1px solid #f1f3f5;
+  vertical-align: top;
+}
+
+.plans-table input[type="text"] {
+  padding: 6px 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font: inherit;
+  text-transform: uppercase;
+}
+
+.plans-table button,
+.plans-button {
+  display: inline-block;
+  padding: 6px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #fff;
+  font: inherit;
+  font-size: 0.82rem;
+  color: #1f2937;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.plans-table button:hover:not(:disabled),
+.plans-button:hover {
+  background: #f3f4f6;
+}
+
+.plans-table button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.plans-actions {
+  white-space: nowrap;
+}
+
+.plans-actions > * {
+  margin: 0 4px 4px 0;
+}
+
+.plans-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.plans-row button {
+  padding: 8px 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+
+.plans-primary {
+  background: #007acc;
+  border-color: #007acc;
+  color: #fff;
+  font-weight: 600;
+}
+
+.plans-row .plans-primary:hover:not(:disabled) {
+  background: #005f99;
+}
+
+.plans-row button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* A row mid-flight, and a row that did not make it. */
+.plans-state-sending {
+  opacity: 0.7;
+}
+
+.plans-state-done td {
+  color: #15803d;
+}
+
+.plans-state-failed td {
+  background: #fff7ed;
+}
+
+/* ------------------------------ The library ----------------------------- */
+.plans-drawing {
+  white-space: nowrap;
+}
+
+/* Small on purpose: enough to recognise the floor and see that the picture
+   rendered at all, which is all this column is being asked. */
+.plans-thumb {
+  width: 68px;
+  height: 48px;
+  object-fit: contain;
+  object-position: left center;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #fff;
+  vertical-align: middle;
+  margin-right: 8px;
+}
+
+.plans-version-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.plans-version-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid #f1f3f5;
+}
+
+/* ------------------------------- Results -------------------------------- */
+.plans-result-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.plans-result {
+  border: 1px solid #d1fae5;
+  background: #f0fdf4;
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+}
+
+/* The upload worked, but something about it needs a person's eye -- usually
+   a plan that has to be lined up with its building again. */
+.plans-result-check {
+  border-color: #fed7aa;
+  background: #fffbeb;
+}
+
+.plans-result ul {
+  margin: 6px 0 10px;
+  padding-left: 18px;
+  color: #4b5563;
+  font-size: 0.88rem;
+}
+
+.plans-history {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 0.9rem;
+}
+
+.plans-history li {
+  padding: 7px 0;
+  border-bottom: 1px solid #f1f3f5;
+}
+
+@media (max-width: 720px) {
+  .plans-table,
+  .plans-table tbody,
+  .plans-table tr,
+  .plans-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .plans-table thead {
+    display: none;
+  }
+
+  .plans-table tr {
+    border-bottom: 1px solid #e5e7eb;
+    padding: 6px 0;
+  }
+
+  .plans-table td {
+    border: 0;
+    padding: 4px 0;
+  }
+}

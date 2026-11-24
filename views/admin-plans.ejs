@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title><%= title %></title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/admin-plans.css" />
+</head>
+
+<body>
+  <%- include('_menu', { page: 'plans', user: user }) %>
+
+  <main class="plans-shell">
+    <!-- A div, not a <header>: the site paints every header element in the
+         navigation blue, which is right for the bar at the top of the page
+         and turns this into white text on a blue slab. -->
+    <div class="plans-head">
+      <h2>Floor Plans</h2>
+      <p class="plans-lede">
+        The Drawings the App Is Traced from. When Facilities Reissues a Sheet,
+        Drop the New One Here: the Picture Under the Tracer Is Rebuilt from It,
+        the Copy It Replaces Is Kept, and the Position the Plan Had on the Map
+        Is Carried over Wherever the Two Drawings Agree About the Page They
+        Came From.
+      </p>
+    </div>
+
+    <!-- --------------------------------- Upload ------------------------- -->
+    <section class="plans-block">
+      <div class="plans-drop" id="drop" tabindex="0" role="button"
+           aria-label="Add floor plans">
+        <input type="file" id="filePick" multiple hidden
+               accept=".pdf,.png,application/pdf,image/png">
+        <p class="plans-drop-main">Drop Floor Plans Here</p>
+        <p class="plans-hint">
+          Or <button type="button" class="plans-link" id="pick">Choose Files</button>
+          — PDF Drawings, or PNG Pictures of One.
+        </p>
+        <p class="plans-hint">
+          A File Named <code>SW1-Floor2.pdf</code> Goes to SW1, Floor 2. Names
+          That Cannot Be Read Are Still Accepted — You Say Where They Belong
+          Before Uploading.
+        </p>
+      </div>
+
+      <!-- Nothing is sent on drop. What each file is gets shown first,
+           because the one thing worse than a sheet that will not upload is a
+           sheet that uploads onto the wrong floor. -->
+      <div class="plans-queue" id="queueBlock" hidden>
+        <h3>Ready to Upload <span class="plans-count" id="queueCount">0</span></h3>
+        <table class="plans-table">
+          <thead>
+            <tr>
+              <th scope="col">File</th>
+              <th scope="col">Building</th>
+              <th scope="col">Floor</th>
+              <th scope="col">What It Changes</th>
+              <th scope="col"></th>
+            </tr>
+          </thead>
+          <tbody id="queueRows"></tbody>
+        </table>
+        <div class="plans-row">
+          <button type="button" id="uploadAll" class="plans-primary">Upload</button>
+          <button type="button" id="clearQueue">Clear</button>
+          <span class="plans-note" id="queueState"></span>
+        </div>
+      </div>
+
+      <div class="plans-results" id="resultsBlock" hidden>
+        <h3>Just Uploaded</h3>
+        <ul class="plans-result-list" id="resultList"></ul>
+      </div>
+    </section>
+
+    <!-- --------------------------------- Library ------------------------ -->
+    <section class="plans-block">
+      <div class="plans-head-row">
+        <h3>Sheets <span class="plans-count" id="planCount">0</span></h3>
+        <input type="search" id="planFilter" class="plans-filter"
+               placeholder="Filter by Building…" autocomplete="off"
+               aria-label="Filter sheets">
+      </div>
+      <p class="plans-note" id="libraryState">Loading…</p>
+      <table class="plans-table plans-library">
+        <thead>
+          <tr>
+            <th scope="col">Sheet</th>
+            <th scope="col">Drawing</th>
+            <th scope="col">Traced</th>
+            <th scope="col">On the Map</th>
+            <th scope="col">Source</th>
+            <th scope="col"></th>
+          </tr>
+        </thead>
+        <tbody id="planRows"></tbody>
+      </table>
+    </section>
+
+    <!-- --------------------------------- History ------------------------ -->
+    <section class="plans-block" id="historyBlock" hidden>
+      <h3>Recent Changes</h3>
+      <ul class="plans-history" id="historyList"></ul>
+    </section>
+  </main>
+
+  <script defer type="module" src="/js/admin-plans.js"></script>
+</body>
+
+</html>
