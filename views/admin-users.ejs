@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title><%= title %></title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/admin-console.css" />
+</head>
+
+<body>
+  <%- include('_menu', { page: 'users', user: user }) %>
+
+  <main class="admin-shell">
+    <div class="admin-head">
+      <h2>People</h2>
+      <p class="admin-lede">
+        Everybody With an Account. Nearly All of Them Are Ordinary Users, Who
+        Search for Rooms and Save Favourites; a Few Maintain the Map Itself.
+        Only an Administrator Can Appoint Another One, and Nobody Can Stand
+        Themselves Down — so the Campus Is Never Left Without One.
+      </p>
+    </div>
+
+    <section class="admin-block">
+      <div class="admin-head-row">
+        <h3>Accounts <span class="admin-count" id="userCount">0</span></h3>
+        <input type="search" id="userFilter" class="admin-filter"
+               placeholder="Filter by name or address…" autocomplete="off"
+               aria-label="Filter accounts">
+      </div>
+      <p class="admin-note" id="userState">Loading…</p>
+
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th scope="col">Account</th>
+            <th scope="col">Role</th>
+            <th scope="col">Last Signed In</th>
+            <th scope="col"></th>
+          </tr>
+        </thead>
+        <tbody id="userRows"></tbody>
+      </table>
+    </section>
+
+    <section class="admin-block">
+      <h3>How Somebody Becomes an Administrator</h3>
+      <ul class="admin-points">
+        <li>
+          <strong>Appointed Here.</strong> Any Administrator Can Make Another
+          One, and Stand Any of the Others Down. The Change Is Written to the
+          Firebase Account Itself — There Is No Second List Anywhere — and the
+          Person Is Signed Out, So Their Next Sign-In Starts With It.
+        </li>
+        <li>
+          <strong>Never by Themselves.</strong> What Marks an Administrator Can
+          Only Be Written by This Server, So Being Appointed Is Always
+          Something Done to an Account Rather Than by It. Nobody Can Stand
+          Themselves Down Either, So the Campus Is Never Left Without One.
+        </li>
+        <li>
+          <strong>The First One.</strong> On a New Deployment Nobody Is an
+          Administrator Yet and This Page Cannot Be Reached, so the First Is
+          Appointed on the Server:
+          <code>node scripts/make-admin.js someone@bcit.ca</code>. That Is Also
+          the Way Back if Every Administrator Is Removed.
+        </li>
+      </ul>
+    </section>
+  </main>
+
+  <script defer type="module" src="/js/admin-users.js"></script>
+</body>
+
+</html>

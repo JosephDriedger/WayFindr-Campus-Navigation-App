@@ -13,6 +13,7 @@
 
 import fs from "fs";
 import path from "path";
+import { fileURLToPath } from "url";
 import session from "express-session";
 
 const Store = session.Store;
@@ -153,4 +154,50 @@ export default class FileSessionStore extends Store {
       }
     });
   }
+}
+
+/**
+ * Where the sessions are kept.
+ *
+ * Named here rather than at the one place that happens to configure the
+ * store, because it is no longer only the store that needs to know: taking
+ * somebody's access away means reaching the sessions they already have.
+ */
+export const SESSION_DIR = path.join(
+  path.dirname(fileURLToPath(import.meta.url)), "..", ".sessions");
+
+/**
+ * Sign one person out, everywhere they are signed in.
+ *
+ * A session carries who somebody is, including whether they maintain the
+ * map, and it was decided when they signed in. So taking an administrator's
+ * access away does nothing at all until their session ends -- they keep the
+ * answer they were given, for days. Ending the sessions is what makes the
+ * change true now rather than eventually.
+ *
+ * Returns how many were ended, so the person doing it can be told.
+ */
+export function dropSessionsFor(uid, dir = SESSION_DIR) {
+  if (!uid) return 0;
+  let names;
+  try {
+    names = fs.readdirSync(dir);
+  } catch {
+    return 0;   // nobody has signed in on this host yet
+  }
+  let ended = 0;
+  for (const name of names) {
+    if (!name.endsWith(".json")) continue;
+    const file = path.join(dir, name);
+    try {
+      const record = JSON.parse(fs.readFileSync(file, "utf-8"));
+      if (record?.session?.user?.uid !== uid) continue;
+      fs.unlinkSync(file);
+      ended += 1;
+    } catch {
+      // unreadable, or gone already: either way it is not a session
+      // anybody is still using
+    }
+  }
+  return ended;
 }

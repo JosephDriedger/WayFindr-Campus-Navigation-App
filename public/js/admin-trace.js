@@ -37,10 +37,10 @@ async function fetchJson(url, options) {
   } catch {
     if (/^\s*</.test(body)) {
       throw new Error(res.redirected || res.status === 401
-        ? "Signed out — log in again to keep tracing."
-        : `The server returned a page, not data (${res.status}).`);
+        ? "Signed Out — Log in Again to Keep Tracing."
+        : `The Server Returned a Page, Not Data (${res.status}).`);
     }
-    throw new Error(`Unreadable response from the server (${res.status}).`);
+    throw new Error(`Unreadable Response from the Server (${res.status}).`);
   }
   if (!res.ok) {
     // Two error shapes reach here: this app's own `{error: "what went
@@ -56,7 +56,7 @@ async function fetchJson(url, options) {
 }
 
 const token = document.querySelector('meta[name="mapbox-token"]')?.content;
-if (!token) throw new Error("Missing Mapbox token");
+if (!token) throw new Error("Missing Mapbox Token");
 mapboxgl.accessToken = token;
 
 const map = new mapboxgl.Map({
@@ -181,9 +181,9 @@ const PLAN_LINE_COLOUR = ["case", isSelected, "#111827", byType("line")];
 const PLAN_LINE_WIDTH = ["case", isSelected, 4, ["*", 1.6, byType("width")]];
 
 const ZONE_COLOURS = {
-  here:    { dot: "#f59e0b", label: "This floor" },
-  floor:   { dot: "#10b981", label: "Other floor" },
-  other:   { dot: "#ec4899", label: "Other building" },
+  here:    { dot: "#f59e0b", label: "This Floor" },
+  floor:   { dot: "#10b981", label: "Other Floor" },
+  other:   { dot: "#ec4899", label: "Other Building" },
   outside: { dot: "#64748b", label: "Outdoors" },
 };
 
@@ -679,7 +679,7 @@ function displayNames() {
       const [a, b] = r.nodes || [];
       return {
         title: `Link ${endName(a)} \u2194 ${endName(b)}`,
-        sub: "path",
+        sub: "Path",
       };
     }
     if (r.type === "node") {
@@ -690,7 +690,7 @@ function displayNames() {
       const label = r.name || `Node ${seen.node}`;
       return {
         title: label,
-        sub: r.room ? `serves ${r.room}` : (r.building || "outdoors"),
+        sub: r.room ? `Serves ${r.room}` : (r.building || "Outdoors"),
         short: label,
       };
     }
@@ -699,11 +699,15 @@ function displayNames() {
       const what = r.type === "entrance" ? "Entrance" : "Door";
       return {
         title: `${what} ${seen[r.type]}`,
-        sub: (r.connects || []).join(" ↔ ") || "unlinked",
+        sub: (r.connects || []).join(" ↔ ") || "Unlinked",
         short: `${what[0]}${seen[r.type]}`,
       };
     }
-    return { title: r.room || "(unnumbered)", sub: r.type, short: r.room || "" };
+    return {
+      title: r.room || "(Unnumbered)",
+      sub: outlineTypeLabel(r.type),
+      short: r.room || "",
+    };
   });
 }
 
@@ -832,7 +836,7 @@ function whereIs(node) {
   const parts = [];
   if (node.building) parts.push(node.building);
   else parts.push("outdoors");
-  if (node.floor != null && node.floor !== "") parts.push(`floor ${node.floor}`);
+  if (node.floor != null && node.floor !== "") parts.push(`Floor ${node.floor}`);
   const where = parts.join(" ");
   return node.room ? `${where} · ${node.room}` : where;
 }
@@ -1221,8 +1225,8 @@ function setMode(next) {
   el("netToolsResult").hidden = true;
   syncNetTool();
   setDrawHint(next === "network"
-    ? "Click where someone can stand. A node inside a building belongs to it."
-    : "Click each corner, then Finish. Double-click also closes it.");
+    ? "Click Where Someone Can Stand. A Node Inside a Building Belongs to It."
+    : "Click Each Corner, Then Finish. Double-Click Also Closes It.");
   applyModeStyling();
   renderRoomList();
 }
@@ -1310,7 +1314,7 @@ function makeHandles() {
   };
 
   // Move: drag the plan bodily. Size and angle are untouched.
-  moveMarker = new mapboxgl.Marker({ element: mk("move", "Drag to move"), draggable: true })
+  moveMarker = new mapboxgl.Marker({ element: mk("move", "Drag to Move"), draggable: true })
     .setLngLat([placement.lng, placement.lat]).addTo(map);
   moveMarker.on("drag", () => {
     const p = moveMarker.getLngLat();
@@ -1327,7 +1331,7 @@ function makeHandles() {
   const aspect = () => current.width / current.height;
   const halfDiagPerWidth = () => Math.hypot(1, 1 / aspect()) / 2;
 
-  sizeMarker = new mapboxgl.Marker({ element: mk("size", "Drag to resize"), draggable: true })
+  sizeMarker = new mapboxgl.Marker({ element: mk("size", "Drag to Resize"), draggable: true })
     .setLngLat(uvToLngLat(SIZE_UV)).addTo(map);
   sizeMarker.on("drag", () => {
     const [dx, dy] = offsetFromCentre(sizeMarker.getLngLat());
@@ -1338,7 +1342,7 @@ function makeHandles() {
   });
 
   // Rotate: swing the stalk round the centre. The size is held.
-  rotateMarker = new mapboxgl.Marker({ element: mk("rotate", "Drag to rotate"), draggable: true })
+  rotateMarker = new mapboxgl.Marker({ element: mk("rotate", "Drag to Rotate"), draggable: true })
     .setLngLat(uvToLngLat(ROTATE_UV)).addTo(map);
   rotateMarker.on("drag", () => {
     const [dx, dy] = offsetFromCentre(rotateMarker.getLngLat());
@@ -1526,14 +1530,14 @@ function restore(json) {
 }
 
 function undo() {
-  if (!past.length) { updateUndoButtons(); setDrawHint("Nothing left to undo."); return; }
+  if (!past.length) { updateUndoButtons(); setDrawHint("Nothing Left to Undo."); return; }
   future.push(JSON.stringify(rooms));
   restore(past.pop());
   setDrawHint("Undone.");
 }
 
 function redo() {
-  if (!future.length) { updateUndoButtons(); setDrawHint("Nothing to redo."); return; }
+  if (!future.length) { updateUndoButtons(); setDrawHint("Nothing to Redo."); return; }
   past.push(JSON.stringify(rooms));
   restore(future.pop());
   setDrawHint("Redone.");
@@ -1668,7 +1672,7 @@ function selectItem(i) {
   // name that mean nothing. Selecting it and saying how to remove it is the
   // whole of what you can do with one.
   if (rooms[i]?.kind === "path") {
-    setDrawHint(`${names[i]?.title || "Link"} selected — press Delete to remove it.`);
+    setDrawHint(`${names[i]?.title || "Link"} Selected — Press Delete to Remove It.`);
     return;
   }
   openDialog(i);
@@ -1705,7 +1709,7 @@ function onMapClick(e) {
 
   if (isBridgeType(type)) {
     if (!bridgeEnds) {
-      setDrawHint("Pick a place and a floor at each end first.");
+      setDrawHint("Pick a Place and a Floor at Each End First.");
       return;
     }
     bridgeClick(e.lngLat);
@@ -1717,7 +1721,7 @@ function onMapClick(e) {
     // put there on purpose, it does not invent them
     const node = nodeNear(e.lngLat);
     if (!node) {
-      setDrawHint("Click directly on a node. Nothing to link to there.");
+      setDrawHint("Click Directly on a Node. Nothing to Link to There.");
       return;
     }
     const first = draft.length ? draft[0] : null;
@@ -1726,11 +1730,11 @@ function onMapClick(e) {
       // Which node you picked, named. Six hundred dots look alike, and a link
       // out of this building is exactly the case where being one dot off
       // matters -- so both ends are said out loud rather than assumed.
-      setDrawHint(`From ${whereIs(node)}. Now click the node to link it to.`);
+      setDrawHint(`From ${whereIs(node)}. Now Click the Node to Link It To.`);
       return;
     }
     if (first === node.nid) {
-      setDrawHint("Pick a different node for the other end.");
+      setDrawHint("Pick a Different Node for the Other End.");
       return;
     }
     // Clicking a pair that is already joined removes the link. Refusing was
@@ -1747,8 +1751,8 @@ function onMapClick(e) {
     markDirty();
     const joined = `${whereIs(nodeById(first))} ↔ ${whereIs(node)}`;
     setDrawHint(existing >= 0
-      ? `Unlinked ${joined}. Click the same two again to put it back.`
-      : `Linked ${joined}. Click a node to start another link.`);
+      ? `Unlinked ${joined}. Click the Same Two Again to Put It Back.`
+      : `Linked ${joined}. Click a Node to Start Another Link.`);
     return;
   }
 
@@ -1756,7 +1760,7 @@ function onMapClick(e) {
     // one node per click, and stay put so a run of them can be dropped
     // without going back to the button each time
     if (nodeNear(e.lngLat)) {
-      setDrawHint("There is already a node there.");
+      setDrawHint("There Is Already a Node There.");
       return;
     }
     // A node dropped inside a room is a node FOR that room -- which is what
@@ -1796,7 +1800,7 @@ function onMapClick(e) {
     const where = servedRoom
       ? `serves ${servedRoom}${place ? ` in ${place}` : ""}`
       : place ? `is in ${place}`
-        : "is outdoors, in no building or lot";
+        : "Is Outdoors, in No Building or Lot";
     setDrawHint(`${n} nodes placed — ${placed.name} ${where}.`);
     return;
   }
@@ -1917,7 +1921,7 @@ function fillList(list, entries, emptyText, opts = {}) {
     const hidden = matching.length - shown.length;
     moreEl.hidden = hidden <= 0;
     moreEl.textContent = hidden > 0
-      ? `Showing ${shown.length} of ${matching.length} — type above to narrow it down.`
+      ? `Showing ${shown.length} of ${matching.length} — Type Above to Narrow It Down.`
       : "";
   }
 
@@ -2012,15 +2016,15 @@ function renderRoomList() {
     el("netCount").textContent = shown.length;
     el("nodeCount").textContent = nodes.length;
     el("linkCount").textContent = links.length;
-    fillList(el("nodeList"), nodes, "No nodes yet.",
+    fillList(el("nodeList"), nodes, "No Nodes Yet.",
       { filter: el("nodeFilter")?.value || "", moreEl: el("nodeMore") });
-    fillList(el("linkList"), links, "No links yet.",
+    fillList(el("linkList"), links, "No Links Yet.",
       { filter: el("linkFilter")?.value || "", moreEl: el("linkMore") });
     return;
   }
 
   el("roomCount").textContent = shown.length;
-  fillList(el("roomList"), shown, "Nothing traced yet.");
+  fillList(el("roomList"), shown, "Nothing Traced Yet.");
 }
 
 const OUTSIDE = "outside";
@@ -2411,7 +2415,7 @@ function setBridgeEnds(next) {
 
 /** A place and the floor of it being worked with: "SE12 floor 2". */
 const endLabel = (place, floor) =>
-  `${placeLabel(place)}${floor ? ` floor ${floor}` : ""}`;
+  `${placeLabel(place)}${floor ? ` Floor ${floor}` : ""}`;
 
 const fromLabel = () => endLabel(bridgeEnds.from, bridgeEnds.fromFloor);
 const toLabel = () => endLabel(bridgeEnds.to, bridgeEnds.toFloor);
@@ -2449,30 +2453,30 @@ function showingText() {
   }
   const said = [];
   if (untraced.length) {
-    said.push(`No floor plan traced for ${untraced.join(" or ")}, so only its nodes are drawn.`);
+    said.push(`No Floor Plan Traced for ${untraced.join(" or ")}, so Only Its Nodes Are Drawn.`);
   }
   if (unchosen.length) {
-    said.push(`Pick a floor for ${unchosen.join(" and ")} to see its plan.`);
+    said.push(`Pick a Floor for ${unchosen.join(" and ")} to See Its Plan.`);
   }
-  return said.length ? ` ${said.join(" ")}` : " Both floor plans are drawn.";
+  return said.length ? ` ${said.join(" ")}` : " Both Floor Plans Are Drawn.";
 }
 
 /** Say what is on show and what to do with it. */
 function describeBridge() {
   if (!el("bridgeFrom").value || !el("bridgeTo").value) {
-    setBridgeHint("Pick the two places you want someone to be able to walk between.");
+    setBridgeHint("Pick the Two Places You Want Someone to Be Able to Walk Between.");
     return;
   }
   if (el("bridgeFrom").value === el("bridgeTo").value) {
-    setBridgeHint("Pick two different places — this joins one to another.");
+    setBridgeHint("Pick Two Different Places — This Joins One to Another.");
     return;
   }
   if (!bridgeEnds) return;
   const a = endCount(bridgeEnds.from, bridgeEnds.fromFloor);
   const b = endCount(bridgeEnds.to, bridgeEnds.toFloor);
   setBridgeHint(`${fromLabel()} has ${a} node${a === 1 ? "" : "s"}, `
-    + `${toLabel()} has ${b}. Everything else is off the map.${showingText()}`
-    + " Click Link Nodes, then a node on each side.");
+    + `${toLabel()} Has ${b}. Everything Else Is Off the Map.${showingText()}`
+    + " Click Link Nodes, Then a Node on Each Side.");
 }
 
 /** A box round everything drawn on one sheet, or null if it is empty. */
@@ -2549,8 +2553,8 @@ function showBothFloors() {
 function bridgeClick(lngLat) {
   const node = nodeNear(lngLat);
   if (!node) {
-    setDrawHint(`Click directly on a node. Only ${fromLabel()} and ${toLabel()} `
-      + "are on the map — everything else is hidden while you join these two.");
+    setDrawHint(`Click Directly on a Node. Only ${fromLabel()} And ${toLabel()} `
+      + "Are on the Map — Everything Else Is Hidden While You Join These Two.");
     return;
   }
   const end = bridgeEndOf(node);
@@ -2558,19 +2562,19 @@ function bridgeClick(lngLat) {
   if (!first) {
     draft.push(node.nid);
     const other = end === "from" ? toLabel() : fromLabel();
-    setDrawHint(`From ${whereIs(node)}. Now click the node in ${other} to join it to.`);
+    setDrawHint(`From ${whereIs(node)}. Now Click the Node in ${other} to Join It To.`);
     return;
   }
   if (first.nid === node.nid) {
-    setDrawHint("Pick a different node for the other end.");
+    setDrawHint("Pick a Different Node for the Other End.");
     return;
   }
   // Both ends in the same place is not the link this tool is for, and it is
   // the mistake the tool exists to catch: it means the wrong dot was hit.
   if (bridgeEndOf(first) === end) {
-    setDrawHint(`Both of those are in ${endLabel(nodePlace(node),
+    setDrawHint(`Both of Those Are In ${endLabel(nodePlace(node),
       end === "from" ? bridgeEnds.fromFloor : bridgeEnds.toFloor)}. `
-      + "The second node has to be on the other side.");
+      + "The Second Node Has to Be on the Other Side.");
     return;
   }
   // Clicking a pair that is already joined removes the link -- the tool for
@@ -2587,8 +2591,8 @@ function bridgeClick(lngLat) {
   const apart = metresText(metresBetween(itemLngLat(first), itemLngLat(node)));
   const joined = `${whereIs(first)} ↔ ${whereIs(node)}`;
   setDrawHint(existing >= 0
-    ? `Unlinked ${joined}. Click the same two again to put it back.`
-    : `Joined ${joined}, ${apart} apart. Click another pair, or Done.`);
+    ? `Unlinked ${joined}. Click the Same Two Again to Put It Back.`
+    : `Joined ${joined}, ${apart} Apart. Click Another Pair, or Done.`);
 }
 
 const outlineLabel = (r) => (r.room ? `${r.room} (${r.type})` : `unnumbered ${r.type}`);
@@ -2610,7 +2614,7 @@ function connectOptions(uv, selected, includeOutside) {
 
   const opts = ['<option value="">— nothing —</option>'];
   if (includeOutside) {
-    opts.push(`<option value="${OUTSIDE}"${selected === OUTSIDE ? " selected" : ""}>Outside the building</option>`);
+    opts.push(`<option value="${OUTSIDE}"${selected === OUTSIDE ? " selected" : ""}>Outside the Building</option>`);
   }
   for (const { r } of ranked) {
     if (!r.room) {
@@ -2761,7 +2765,7 @@ function removeItem(i) {
   markDirty();
   const links = doomed.size - 1;
   if (links > 0) {
-    setDrawHint(`Deleted, along with ${links} link${links === 1 ? "" : "s"} that used it.`);
+    setDrawHint(`Deleted, Along with ${links} Link${links === 1 ? "" : "s"} That Used It.`);
   }
 }
 
@@ -2793,11 +2797,11 @@ function markDirty() {
   // outlines are is what decides whether a node is inside one.
   forgetShapeIndex();
   dirty = true;
-  el("saveState").textContent = "unsaved changes";
+  el("saveState").textContent = "Unsaved Changes";
 }
 
 async function saveFloor() {
-  el("saveState").textContent = "saving…";
+  el("saveState").textContent = "Saving…";
   try {
     // The network can be worked on with no sheet open -- it spans the campus
     // -- so with no floor there is simply nothing of a floor to write.
@@ -2805,7 +2809,7 @@ async function saveFloor() {
       const net = await saveNetwork();
       dirty = false;
       el("saveState").textContent =
-        `saved ${net.nodes} nodes and ${net.links} links`;
+        `Saved ${net.nodes} Nodes and ${net.links} Links`;
       await rebuildDerived();
       return;
     }
@@ -2831,8 +2835,8 @@ async function saveFloor() {
     await savePlacement();
     dirty = false;
     el("saveState").textContent =
-      `saved ${data.features} on ${current.building} floor ${current.floor}, `
-      + `${net.nodes} nodes and ${net.links} links campus-wide`;
+      `Saved ${data.features} on ${current.building} Floor ${current.floor}, `
+      + `${net.nodes} Nodes and ${net.links} Links Campus-Wide`;
 
     // Saving writes the files; the app reads a search index and a routing
     // graph built FROM those files. Leaving the rebuild as a separate button
@@ -2947,7 +2951,7 @@ function applyPlacements(placed, features) {
 async function saveNetwork() {
   if (!networkLoaded) {
     throw new Error(
-      "The network did not load, so it will not be saved over. Reload the page."
+      "The Network Did Not Load, so It Will Not Be Saved over. Reload the Page."
     );
   }
 
@@ -3064,7 +3068,7 @@ async function loadNetwork() {
 let planLoadSeq = 0;
 
 async function loadPlan(stem) {
-  if (dirty && !confirm("This floor has unsaved changes. Leave anyway?")) return;
+  if (dirty && !confirm("This Floor Has Unsaved Changes. Leave Anyway?")) return;
   const sheet = plans.find((p) => p.stem === stem);
   if (!sheet) return;
 
@@ -3154,8 +3158,8 @@ async function loadPlan(stem) {
   const outlines = rooms.filter((r) => r.kind === "polygon").length;
   const netCount = rooms.filter(inNetwork).length;
   el("planStatus").textContent =
-    `${current.building} floor ${current.floor} — ${outlines} outline${outlines === 1 ? "" : "s"}`
-    + (netCount ? `, ${netCount} in the walking network` : "");
+    `${current.building} Floor ${current.floor} — ${outlines} Outline${outlines === 1 ? "" : "s"}`
+    + (netCount ? `, ${netCount} In the Walking Network` : "");
   drawOverview();
   updateFloorFocus();
 
@@ -3290,7 +3294,7 @@ function renderPlanOptions() {
   if (!picker) return;
   const chosen = picker.value;
   picker.innerHTML = '<option value="">Choose a Floor…</option>' +
-    plans.map((p) => `<option value="${esc(p.stem)}">${esc(p.building)} — floor ${esc(p.floor)}${p.traced ? " ✓" : ""}</option>`).join("");
+    plans.map((p) => `<option value="${esc(p.stem)}">${esc(p.building)} — Floor ${esc(p.floor)}${p.traced ? " ✓" : ""}</option>`).join("");
   if (chosen) picker.value = chosen;
 }
 
@@ -3357,15 +3361,17 @@ const loadPlanList = async () => {
   });
 
   if (!plans.length) {
-    el("planStatus").textContent =
-      "No plan images yet. Run: py -3 floorPlans/render_plan_images.py";
+    // There is a page for this now, so the answer is a link rather than a
+    // command line: adding the first sheet is the same job as replacing one.
+    el("planStatus").innerHTML =
+      'No Floor Plans Yet. Add One on the <a href="/admin/plans">Floor Plans</a> Page.';
     return;
   }
 
   const done = plans.filter((p) => p.traced).length;
   if (done) {
     el("planStatus").textContent =
-      `${done} floor${done === 1 ? "" : "s"} traced — click one on the map, or pick a floor.`;
+      `${done} Floor${done === 1 ? "" : "s"} Traced — Click One on the Map, or Pick a Floor.`;
   }
   loadOverview();
 
@@ -3405,7 +3411,7 @@ map.on("mousedown", (e) => {
   if (g || insideSelected(e.lngLat)) {
     if (g && g.kind === "corner" && (e.originalEvent?.altKey)) {
       // alt-click takes a corner away, but never below a triangle
-      if (r.uv.length <= 3) { setDrawHint("A room needs at least three corners."); return; }
+      if (r.uv.length <= 3) { setDrawHint("A Room Needs at Least Three Corners."); return; }
       remember();
       r.uv.splice(g.i, 1);
       redrawRooms();
@@ -3518,8 +3524,8 @@ map.on("mouseup", () => {
     if (served !== r.room) {
       r.room = served;
       setDrawHint(served
-        ? `Moved -- this node now serves ${served}.`
-        : "Moved -- this node is no longer inside a numbered outline.");
+        ? `Moved -- This Node Now Serves ${served}.`
+        : "Moved -- This Node Is No Longer Inside a Numbered Outline.");
     } else {
       setDrawHint("Moved.");
     }
@@ -3595,6 +3601,17 @@ map.on("moveend", () => {
  * the map to it -- which is right the first time and wrong every time after.
  */
 async function restoreSession() {
+  // A link from the plan library names the floor to open, and that beats
+  // whatever was open last: somebody has just added or replaced that sheet
+  // and this is them coming to look at it. Opening a plan moves the map to
+  // it, which is what you want here and is why the camera is not restored.
+  const asked = new URLSearchParams(window.location.search).get("plan");
+  if (asked && plans.some((pl) => pl.stem === asked)) {
+    el("planPicker").value = asked;
+    await loadPlan(asked);
+    return;
+  }
+
   const saved = lastSession();
   if (!saved) return;
 
@@ -3664,7 +3681,7 @@ function updateFloorFocus() {
   const label = el("floorFocusCount");
   if (!label || !current) return;
   if (!floorFocus) {
-    label.textContent = "every floor is showing";
+    label.textContent = "Every Floor Is Showing";
     return;
   }
   let hidden = 0;
@@ -3682,8 +3699,8 @@ function updateFloorFocus() {
     if (f.properties.stem !== current.stem) tally(f.properties);
   }
   label.textContent = hidden
-    ? `${hidden} hidden on other floors${kept ? `, ${kept} stairs and lifts kept` : ""}`
-    : "stairs and lifts still show";
+    ? `${hidden} Hidden on Other Floors${kept ? `, ${kept} Stairs and Lifts Kept` : ""}`
+    : "Stairs and Lifts Still Show";
 }
 
 el("floorFocus")?.addEventListener("change", (e) => {
@@ -3786,13 +3803,13 @@ const beginDrawing = () => {
   setDrafting(true);
   const t = activeType();
   setDrawHint(
-    t === "node" ? "Click to drop a node. Keep clicking to place more."
+    t === "node" ? "Click to Drop a Node. Keep Clicking to Place More."
       : isBridgeType(t) ? (bridgeEnds
-        ? `Click a node in ${fromLabel()}, then the node in ${toLabel()} to join them.`
-        : "Pick a place and a floor at each end first.")
-        : isLinkType(t) ? "Click one node, then the node to link it to."
-          : isPointType(t) ? "Click where the door or entrance is."
-            : "Click each corner, then Finish. Double-click also closes it.");
+        ? `Click a Node in ${fromLabel()}, Then the Node in ${toLabel()} to Join Them.`
+        : "Pick a Place and a Floor at Each End First.")
+        : isLinkType(t) ? "Click One Node, Then the Node to Link It To."
+          : isPointType(t) ? "Click Where the Door or Entrance Is."
+            : "Click Each Corner, Then Finish. Double-Click Also Closes It.");
 };
 
 el("startDraw").addEventListener("click", beginDrawing);
@@ -3803,8 +3820,8 @@ for (const id of ["nodeFilter", "linkFilter"]) {
 el("doneNetDraw").addEventListener("click", () => {
   cancelDraft();
   setDrawHint(activeType() === "node"
-    ? "Done placing. Click Place Nodes to add more."
-    : "Done linking. Click Link Nodes to join more.");
+    ? "Done Placing. Click Place Nodes to Add More."
+    : "Done Linking. Click Link Nodes to Join More.");
 });
 el("startNetDraw").addEventListener("click", beginDrawing);
 
@@ -3863,7 +3880,7 @@ for (const id of ["bridgeFromFloor", "bridgeToFloor"]) {
 el("bridgeStart").addEventListener("click", beginDrawing);
 el("bridgeDone").addEventListener("click", () => {
   cancelDraft();
-  setDrawHint("Done linking. Click Link Nodes to join another pair.");
+  setDrawHint("Done Linking. Click Link Nodes to Join Another Pair.");
 });
 el("bridgeShow").addEventListener("click", showBothFloors);
 
@@ -3898,40 +3915,40 @@ el("autoName").addEventListener("click", () => {
   const said = [];
   if (rooms_.named) {
     said.push(`Matched ${rooms_.named} node${rooms_.named === 1 ? "" : "s"} `
-      + "to the room each sits in.");
+      + "To the Room Each Sits In.");
   }
   if (names_.named) {
     said.push(`Named ${names_.named} node${names_.named === 1 ? "" : "s"} — `
-      + "building and room, building floor and an H number, or a count outside.");
+      + "Building and Room, Building Floor and an H Number, or a Count Outside.");
   }
   if (names_.renamed) {
-    said.push(`Renamed ${names_.renamed} whose H number no longer said `
-      + "where they are.");
+    said.push(`Renamed ${names_.renamed} Whose H Number No Longer Said `
+      + "Where They Are.");
   }
   // Said out loud, because it is why fewer were matched than you might have
   // counted on the map: they belong to a floor that is not open, and only
   // that sheet's outlines can say which room they are in.
   if (rooms_.elsewhere) {
-    said.push(`${rooms_.elsewhere} sit on other floors — open those sheets `
-      + "to match them.");
+    said.push(`${rooms_.elsewhere} Sit on Other Floors — Open Those Sheets `
+      + "To Match Them.");
   }
   if (!said.length) {
     said.push(names_.total
-      ? `All ${names_.total} nodes are already named.`
-      : "There are no nodes yet.");
+      ? `All ${names_.total} Nodes Are Already Named.`
+      : "There Are No Nodes Yet.");
   } else if (names_.already && (names_.named || names_.renamed)) {
-    said.push(`${names_.already} already had a name and were left alone.`);
+    said.push(`${names_.already} Already Had a Name and Were Left Alone.`);
   }
   showToolResult(said.join(" "));
 });
 
 el("tidyLinks").addEventListener("click", () => {
   const { duplicates, selfLinks, dangling, removed } = tidyLinks();
-  if (!removed) return showToolResult("No duplicate or broken links to remove.");
+  if (!removed) return showToolResult("No Duplicate or Broken Links to Remove.");
   const parts = [];
   if (duplicates) parts.push(`${duplicates} duplicate`);
-  if (selfLinks) parts.push(`${selfLinks} joining a node to itself`);
-  if (dangling) parts.push(`${dangling} pointing at a missing node`);
+  if (selfLinks) parts.push(`${selfLinks} Joining a Node to Itself`);
+  if (dangling) parts.push(`${dangling} Pointing at a Missing Node`);
   showToolResult(`Removed ${removed} link${removed === 1 ? "" : "s"}: ${parts.join(", ")}.`);
 });
 
@@ -3942,13 +3959,13 @@ async function rebuildDerived() {
   const btn = el("rebuild");
   const state = el("rebuildState");
   btn.disabled = true;
-  state.textContent = "rebuilding…";
+  state.textContent = "Rebuilding…";
   try {
     const data = await fetchJson("/admin/api/rebuild", { method: "POST" });
     // "places" rather than "buildings": a car park is somewhere you can be
     // routed to and is counted here, and it is not a building.
     state.textContent = `${data.rooms} rooms searchable, ${data.buildings} `
-      + `places routable, ${data.nodes} nodes linked by ${data.links} paths`;
+      + `Places Routable, ${data.nodes} Nodes Linked by ${data.links} Paths`;
   } catch (err) {
     state.textContent = err.message;
   } finally {

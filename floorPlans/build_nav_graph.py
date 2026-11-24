@@ -51,6 +51,15 @@ FLOOR_CHANGE_M = 15.0
 DESTINATION_TYPE = "room"
 VERTICAL_SPACES = {"stairs", "elevator"}
 
+# How near two stairwell nodes on neighbouring floors have to stand before
+# they are taken for the same shaft. A flight of stairs does not move between
+# floors, but the node in it does: it sits at a point inside whatever shape
+# that floor's sheet drew for the shaft, and a shaft drawn to its walls on one
+# floor and to its treads on the next puts the two several metres apart. Eight
+# metres is wide enough for that and still narrower than the gap between two
+# different stairwells of one building.
+SAME_SHAFT_M = 8.0
+
 # What to call the part of the network that is not in any building. It is not
 # a building, so it is not counted as one -- but it is worth seeing.
 OUTDOORS = "(outdoors)"
@@ -211,7 +220,7 @@ def stairwell_links(nodes):
         if n.get("space") in VERTICAL_SPACES and n.get("room"):
             wells[(n["building"], n["room"])].append(i)
 
-    out = []
+    out, joined = [], set()
     for members in wells.values():
         by_floor = defaultdict(list)
         for i in members:
@@ -228,6 +237,40 @@ def stairwell_links(nodes):
             )
             if best:
                 out.append((best[0], best[1]))
+                joined.add(best[0])
+                joined.add(best[1])
+
+    # The same stairwell, where the floors disagree about what to call it.
+    #
+    # Matching on the number works when a person traced both floors and gave
+    # the shaft one name. It does not when the sheets name it per floor -- a
+    # stairwell is S202 on the second floor and S302 on the third, which are
+    # two names for one flight of stairs -- and it cannot when the number was
+    # read by machine and misread on one of them. What does not change is
+    # where the shaft is: a stairwell on floor two and a stairwell on floor
+    # three standing in the same few metres of the same building are the same
+    # stairwell, whatever either sheet calls it.
+    rest = defaultdict(lambda: defaultdict(list))
+    for i, n in enumerate(nodes):
+        if i in joined or n.get("space") not in VERTICAL_SPACES:
+            continue
+        if n.get("building") and n.get("floor"):
+            rest[n["building"]][n["floor"]].append(i)
+
+    for by_floor in rest.values():
+        floors = sorted(by_floor)
+        for a, b in zip(floors, floors[1:]):
+            used = set()
+            for i in by_floor[a]:
+                near = [(metres((nodes[i]["lng"], nodes[i]["lat"]),
+                                (nodes[j]["lng"], nodes[j]["lat"])), j)
+                        for j in by_floor[b] if j not in used]
+                if not near:
+                    break
+                d, j = min(near)
+                if d <= SAME_SHAFT_M:
+                    used.add(j)
+                    out.append((i, j))
     return out
 
 

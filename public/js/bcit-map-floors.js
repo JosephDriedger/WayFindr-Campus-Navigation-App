@@ -209,7 +209,7 @@ import { byType } from "./space-colours.js";
                  </button></li>`
             )
             .join("")}</ul>`
-        : `<p class="sidebar-hint">No rooms mapped on this floor yet.</p>`;
+        : `<p class="sidebar-hint">No Rooms Mapped on This Floor Yet.</p>`;
 
       sb.setBody(`
         <div class="place-card">
@@ -825,7 +825,7 @@ import { byType } from "./space-colours.js";
         .filter((r) => isDestinationType(r.type))
         .filter((r) => String(r.room) !== String(props.room));
       const othersHtml = siblings.length
-        ? `<div class="room-list-header">Also on floor ${props.floor || currentFloorLabel}</div>
+        ? `<div class="room-list-header">Also on Floor ${props.floor || currentFloorLabel}</div>
            <ul class="room-list">${siblings.map((r) => `
              <li><button type="button" class="room-row" data-room="${r.room}">
                <span class="room-row-name">${String(r.room).replace(

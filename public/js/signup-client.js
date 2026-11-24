@@ -25,7 +25,7 @@ signupForm.addEventListener('submit', async (e) => {
     });
 
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Signup login failed");
+    if (!res.ok) throw new Error(data.error || "Signup Login Failed");
 
     // 3. Update client UI if needed
     localStorage.setItem('user', 'true');

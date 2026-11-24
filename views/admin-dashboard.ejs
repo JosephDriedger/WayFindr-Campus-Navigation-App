@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title><%= title %></title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/admin-console.css" />
+</head>
+
+<body>
+  <%- include('_menu', { page: 'admin', user: user }) %>
+
+  <main class="admin-shell">
+    <div class="admin-head">
+      <h2>Admin</h2>
+      <p class="admin-lede">
+        The Tools the Campus Map Is Made With, and What It Is Made of Right
+        Now. Everything Here Changes What Other People See, so It Is Kept to
+        the Accounts That Maintain the Map.
+      </p>
+    </div>
+
+    <!-- What the app currently holds. Counted from the files it serves, so
+         these move the moment a floor is traced. -->
+    <section class="admin-block">
+      <h3>Where the Map Stands</h3>
+      <div class="admin-stats">
+        <div class="admin-stat">
+          <span class="admin-stat-number"><%= summary.buildings %></span>
+          <span class="admin-stat-label">Buildings Mapped</span>
+        </div>
+        <div class="admin-stat">
+          <span class="admin-stat-number"><%= summary.floors %></span>
+          <span class="admin-stat-label">Floors Traced</span>
+        </div>
+        <div class="admin-stat">
+          <span class="admin-stat-number"><%= summary.rooms.toLocaleString('en-CA') %></span>
+          <span class="admin-stat-label">Rooms You Can Search</span>
+        </div>
+        <div class="admin-stat">
+          <span class="admin-stat-number"><%= summary.nodes.toLocaleString('en-CA') %></span>
+          <span class="admin-stat-label">Walking Nodes</span>
+        </div>
+        <div class="admin-stat">
+          <span class="admin-stat-number"><%= summary.links.toLocaleString('en-CA') %></span>
+          <span class="admin-stat-label">Links Between Them</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="admin-block">
+      <h3>The Tools</h3>
+      <div class="admin-cards">
+        <a class="admin-card" href="/admin/tracer">
+          <h4>Floor Plan Tracer</h4>
+          <p>
+            Draw the Rooms of a Floor Over Its Drawing, and Run the Walking
+            Paths That Join Them. Saving Rebuilds Search and Routing.
+          </p>
+          <span class="admin-card-note">
+            <%= summary.traced %> of <%= summary.sheets %> Sheets Traced
+          </span>
+        </a>
+
+        <a class="admin-card" href="/admin/plans">
+          <h4>Floor Plans</h4>
+          <p>
+            The Drawings Everything Is Traced From. Add a Sheet, or Replace One
+            BCIT Has Reissued — the Copy It Replaces Is Kept.
+          </p>
+          <span class="admin-card-note">
+            <%= summary.sheets %> Sheets<% if (summary.unplaced) { %>,
+            <%= summary.unplaced %> Not Yet Positioned<% } %>
+          </span>
+        </a>
+
+        <a class="admin-card" href="/admin/users">
+          <h4>People</h4>
+          <p>
+            Who Has an Account, and Which of Them Maintain the Map.
+            Administrators Are Appointed Here, by Other Administrators.
+          </p>
+          <span class="admin-card-note">Appoint or Stand Down an Administrator</span>
+        </a>
+      </div>
+    </section>
+
+    <% if (summary.recent && summary.recent.length) { %>
+    <section class="admin-block">
+      <h3>Recent Floor Plan Changes</h3>
+      <ul class="admin-history">
+        <% summary.recent.forEach(function (h) { %>
+          <li>
+            <strong><%= h.stem %></strong>
+            <%= h.replaced ? 'Replaced' : 'Added' %><% if (h.by) { %> by <%= h.by %><% } %>
+            <span class="admin-note"><%= new Date(h.at).toLocaleString('en-CA') %></span>
+          </li>
+        <% }); %>
+      </ul>
+    </section>
+    <% } %>
+  </main>
+</body>
+
+</html>

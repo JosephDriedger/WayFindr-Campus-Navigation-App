@@ -12,7 +12,7 @@ const favoritesList = document.getElementById("favoritesList");
 // Helper: Get current user's ID token for server requests
 async function getIdToken() {
   const user = auth.currentUser;
-  if (!user) throw new Error("Not authenticated. Please log in.");
+  if (!user) throw new Error("Not Authenticated. Please Log In.");
   return await user.getIdToken(/* forceRefresh */ true);
 }
 
@@ -24,13 +24,13 @@ export async function loadFavorites() {
       headers: { Authorization: `Bearer ${token}` }
     });
 
-    if (!res.ok) throw new Error("Failed to fetch favorites");
+    if (!res.ok) throw new Error("Failed to Fetch Favorites");
     const data = await res.json();
 
     renderFavorites(data.favorites || []);
   } catch (err) {
     console.error("Error loading favorites:", err);
-    favoritesList.innerHTML = `<li class="error">Error loading favorites: ${err.message}</li>`;
+    favoritesList.innerHTML = `<li class="error">Error Loading Favorites: ${err.message}</li>`;
   }
 }
 
@@ -39,7 +39,7 @@ function renderFavorites(favorites) {
   favoritesList.innerHTML = "";
 
   if (!favorites.length) {
-    favoritesList.innerHTML = "<li>No favorites yet.</li>";
+    favoritesList.innerHTML = "<li>No Favorites Yet.</li>";
     return;
   }
 
@@ -111,7 +111,7 @@ function attachHandlers() {
   document.querySelectorAll(".rename-btn").forEach(btn => {
     btn.addEventListener("click", async (e) => {
       const nodeId = e.target.dataset.nodeid;
-      const newLabel = prompt("Enter new label for this favorite:");
+      const newLabel = prompt("Enter New Label for This Favorite:");
       if (newLabel !== null) {
         await renameFavorite(nodeId, newLabel);
         loadFavorites();
@@ -122,7 +122,7 @@ function attachHandlers() {
   document.querySelectorAll(".remove-btn").forEach(btn => {
     btn.addEventListener("click", async (e) => {
       const nodeId = e.target.dataset.nodeid;
-      if (confirm("Remove this favorite?")) {
+      if (confirm("Remove This Favorite?")) {
         await removeFavorite(nodeId);
         loadFavorites(); // refresh
       }
@@ -147,7 +147,7 @@ async function renameFavorite(nodeId, newLabel) {
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify({ nodeId, label: newLabel })
     });
-    if (!res.ok) throw new Error("Failed to rename favorite");
+    if (!res.ok) throw new Error("Failed to Rename Favorite");
     loadFavorites();
   } catch (err) {
     console.error("Error renaming favorite:", err);
@@ -163,7 +163,7 @@ async function removeFavorite(nodeId) {
       method: "DELETE",
       headers: { Authorization: `Bearer ${token}` }
     });
-    if (!res.ok) throw new Error("Failed to remove favorite");
+    if (!res.ok) throw new Error("Failed to Remove Favorite");
   } catch (err) {
     console.error("Error removing favorite:", err);
     alert(err.message);
@@ -178,7 +178,7 @@ async function useFavorite(nodeId) {
       method: "PATCH",
       headers: { Authorization: `Bearer ${token}` }
     });
-    if (!res.ok) throw new Error("Failed to mark favorite as used");
+    if (!res.ok) throw new Error("Failed to Mark Favorite as Used");
   } catch (err) {
     console.error("Error using favorite:", err);
     alert(err.message);
@@ -188,7 +188,7 @@ async function useFavorite(nodeId) {
 // Initialize
 auth.onAuthStateChanged(user => {
   if (!user) {
-    favoritesList.innerHTML = "<li>Please log in to view favorites.</li>";
+    favoritesList.innerHTML = "<li>Please Log in to View Favorites.</li>";
     return;
   }
   loadFavorites();

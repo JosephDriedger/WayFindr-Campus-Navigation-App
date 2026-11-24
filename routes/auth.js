@@ -44,6 +44,15 @@ router.post('/sessionLogin', async (req, res, next) => {
       uid: decodedToken.uid,
       email: decodedToken.email || null,
       displayName: decodedToken.name || profile?.displayName || null,
+      // Whether this person maintains the map, decided once at sign-in.
+      //
+      // A Firebase custom claim, and deliberately NOT a field on their own
+      // user document: almost everyone signing in is an ordinary user, and
+      // a profile is the one record they might be able to write themselves,
+      // which would make becoming an administrator a thing you could do to
+      // yourself. A claim can only be set with the Admin SDK -- by this
+      // server, on the People page, or by scripts/make-admin.js.
+      admin: decodedToken.admin === true,
     };
 
     // finish writing the session before answering, or a redirect that follows
@@ -85,7 +94,17 @@ router.post("/verify", verifyFirebaseToken, async (req, res, next) => {
       console.log(`Created Firestore user doc for UID: ${req.user.uid}`);
     }
 
-    req.session.user = { uid: req.user.uid };
+    // The same shape /sessionLogin stores, because this is the other door
+    // into the same session. A uid on its own cannot answer "is this person
+    // an administrator" -- that is decided from the address they signed in
+    // with -- so signing in through this route used to leave a listed admin
+    // locked out of the tracer with no way to tell why.
+    req.session.user = {
+      uid: req.user.uid,
+      email: req.user.email || profile?.email || null,
+      displayName: req.user.name || profile?.displayName || null,
+      admin: req.user.admin === true,
+    };
     res.json({ message: "User verified", user: req.user });
   } catch(err) {
     next(err);

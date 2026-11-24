@@ -5,3 +5,7 @@
 *.png
 *_seg.json
 *.unverified
+
+# What the OCR saw on each label, kept so a bad reading can be traced back to
+# the glyphs that caused it. Rebuilt by `read_sheet_auto.py`.
+*_ocr.json

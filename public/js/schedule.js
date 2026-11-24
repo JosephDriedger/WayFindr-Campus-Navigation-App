@@ -22,7 +22,7 @@ const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => (
 
 async function getIdToken() {
   const user = auth.currentUser;
-  if (!user) throw new Error("Not authenticated. Please log in.");
+  if (!user) throw new Error("Not Authenticated. Please Log In.");
   return user.getIdToken(true);
 }
 
@@ -75,7 +75,7 @@ function renderNowNext(schedule) {
 
 function renderSchedule(schedule) {
   if (!schedule.length) {
-    listEl.innerHTML = `<p class="schedule-empty">No classes yet. Add one above and it will show up here.</p>`;
+    listEl.innerHTML = `<p class="schedule-empty">No Classes Yet. Add One Above and It Will Show Up Here.</p>`;
     return;
   }
 
@@ -142,7 +142,7 @@ async function load() {
     if (refreshTimer) clearInterval(refreshTimer);
     refreshTimer = setInterval(() => renderNowNext(schedule), 30000);
   } catch (err) {
-    listEl.innerHTML = `<p class="schedule-error">Could not load your schedule: ${esc(err.message)}</p>`;
+    listEl.innerHTML = `<p class="schedule-error">Could Not Load Your Schedule: ${esc(err.message)}</p>`;
   }
 }
 
@@ -152,14 +152,14 @@ formEl?.addEventListener("submit", async (e) => {
 
   const fd = new FormData(formEl);
   const ref = parseRoomRef(fd.get("room"));
-  if (!ref) return showError("Enter the room with its building code, e.g. SW3-1600.");
+  if (!ref) return showError("Enter the Room with Its Building Code, e.g. SW3-1600.");
 
   const days = [...formEl.querySelectorAll('input[name="day"]:checked')].map((i) => Number(i.value));
-  if (!days.length) return showError("Pick at least one day.");
+  if (!days.length) return showError("Pick at Least One Day.");
 
   const startTime = fd.get("startTime");
   const endTime = fd.get("endTime");
-  if (endTime <= startTime) return showError("The end time has to be after the start time.");
+  if (endTime <= startTime) return showError("The End Time Has to Be After the Start Time.");
 
   const submitBtn = formEl.querySelector('button[type="submit"]');
   submitBtn.disabled = true;
@@ -189,6 +189,6 @@ onAuthStateChanged(auth, (user) => {
   if (user) {
     load();
   } else {
-    listEl.innerHTML = `<p class="schedule-empty">Log in to keep a schedule.</p>`;
+    listEl.innerHTML = `<p class="schedule-empty">Log in to Keep a Schedule.</p>`;
   }
 });

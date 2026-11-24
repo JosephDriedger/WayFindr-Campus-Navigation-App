@@ -35,3 +35,8 @@ floorPlans/_manual_backup/
 # The copy the tracer keeps of the network as it was before the last save.
 # Insurance against a bad write, not something to track.
 *.prev
+
+# The sheets a floor-plan upload replaced, kept so a bad update can be put
+# back. They belong to the machine the app is running on -- the drawing that
+# is live is the one that belongs in the repo -- and they are large.
+public/data/floorplan-archive/
